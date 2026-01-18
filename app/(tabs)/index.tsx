@@ -1,98 +1,137 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import AlarmCard from '@/components/AlarmCard';
+import { Colors } from '@/constants/Colors';
+import { useAuth } from '@/context/AuthContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AlarmService } from '@/services/AlarmService';
+import { Alarm } from '@/types/firestore';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function AlarmsScreen() {
+  const [alarms, setAlarms] = useState<Alarm[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const colorScheme = useColorScheme();
+  const theme = Colors[colorScheme ?? 'light'];
+  const router = useRouter();
 
-export default function HomeScreen() {
+  const loadAlarms = async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const userAlarms = await AlarmService.getUserAlarms(user.uid);
+      setAlarms(userAlarms);
+    } catch (error) {
+      console.error('Failed to load alarms', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAlarms();
+    }, [user])
+  );
+
+  const handleToggleActive = async (id: string, value: boolean) => {
+    try {
+      // Optimistic update
+      setAlarms(prev => prev.map(a => a.id === id ? { ...a, isActive: value } : a));
+      await AlarmService.updateAlarm(id, { isActive: value });
+    } catch (error) {
+      console.error('Failed to update alarm', error);
+      loadAlarms(); // Revert on error
+    }
+  };
+
+  const handlePressAlarm = (alarm: Alarm) => {
+    // Navigate to editor with generic param (we'll implement params handling in editor)
+    router.push({ pathname: "/alarm/editor", params: { id: alarm.id } });
+  };
+
+  const handleAddAlarm = () => {
+    router.push("/alarm/editor");
+  };
+
+  const handleTestTrigger = (alarm: Alarm) => {
+    // Navigate to active alarm screen to simulate trigger
+    if (alarm.id) {
+      router.push({ pathname: "/alarm/active", params: { alarmId: alarm.id } });
+    }
+  };
+
+  if (loading && alarms.length === 0) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <FlatList
+        data={alarms}
+        keyExtractor={(item) => item.id!}
+        renderItem={({ item }) => (
+          <AlarmCard
+            alarm={item}
+            onToggleActive={handleToggleActive}
+            onPress={handlePressAlarm}
+            onTestTrigger={handleTestTrigger}
+          />
+        )}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: theme.icon }]}>No alarms set. Sleep tight!</Text>
+            <Text style={[styles.emptySubtext, { color: theme.icon }]}>Tap + to start paying for your sleep.</Text>
+          </View>
+        }
+      />
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: theme.primary }]}
+        onPress={handleAddAlarm}>
+        <FontAwesome name="plus" size={24} color="#FFF" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
   },
-  stepContainer: {
-    gap: 8,
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  emptySubtext: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  fab: {
     position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
 });

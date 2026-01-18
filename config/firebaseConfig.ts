@@ -13,7 +13,13 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+// Temporary rollback to debug hanging issue
+// const auth = initializeAuth(app, {
+//   persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+// });
 const auth = getAuth(app);
+
 const db = getFirestore(app);
 
 export { app, auth, db };

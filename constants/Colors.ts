@@ -19,6 +19,7 @@ export const Colors = {
     accent: '#CBF3F0', // Light Blue/Teal
     deepBlue: '#0F2027', // Dark contrast
     error: '#E63946', // Alert Red
+    border: '#E2E8F0', // Light Grey for borders
     // Gradient stops (for use with expo-linear-gradient)
     sunriseGradient: ['#FF9F1C', '#FFBF69'],
     backgroundGradient: ['#FFF8F0', '#FFF8F0'], // For light mode, maybe plain or subtle
@@ -35,6 +36,7 @@ export const Colors = {
     accent: '#2C5364',
     deepBlue: '#0F2027',
     error: '#E63946',
+    border: '#2C5364', // Darker border
     sunriseGradient: ['#FF9F1C', '#FFBF69'],
     backgroundGradient: ['#0F2027', '#203A43', '#2C5364'], // Deep Blue Gradient
   },

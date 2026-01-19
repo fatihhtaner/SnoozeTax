@@ -37,19 +37,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     useEffect(() => {
+        console.log('[AuthContext] Subscribing to auth state change...');
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            console.log('[AuthContext] Auth state changed. User:', currentUser ? currentUser.uid : 'null');
             setUser(currentUser);
             if (currentUser) {
                 // Fetch detailed profile
                 try {
+                    console.log('[AuthContext] Fetching user profile...');
                     const profile = await UserService.getUser(currentUser.uid);
+                    console.log('[AuthContext] Profile fetched:', profile ? 'success' : 'null');
                     setUserProfile(profile);
                 } catch (error) {
-                    console.error('Error fetching user profile:', error);
+                    console.error('[AuthContext] Error fetching user profile:', error);
                 }
             } else {
                 setUserProfile(null);
             }
+            console.log('[AuthContext] Setting loading to false');
             setLoading(false);
         });
 

@@ -44,19 +44,40 @@ export const UserService = {
         return null;
     },
 
+    async updateUser(uid: string, data: Partial<User>) {
+        const userRef = doc(db, 'users', uid);
+        await updateDoc(userRef, data as any);
+    },
+
     /**
      * Updates user stats after a snooze or alarm event.
      */
-    async updateUserStats(uid: string, penaltyAmount: number = 0, snoozed: boolean = false) {
+    /**
+     * Updates user stats after a snooze or alarm event.
+     */
+    async updateUserStats(uid: string, penaltyAmount: number = 0, snoozed: boolean = false, isWakeUp: boolean = false) {
         const userRef = doc(db, 'users', uid);
 
-        // Logic for discipline score would be more complex in real app, simplistic here
-        // In a real app we might recalculate based on history
+        // Fetch current score to calculate new one
+        // Note: In high concurrency this should be a transaction, but simple get/update is fine for MVP
+        const userSnap = await getDoc(userRef);
+        let currentScore = 100;
+        if (userSnap.exists()) {
+            const userData = userSnap.data() as User;
+            currentScore = userData.stats?.disciplineScore ?? 100;
+        }
+
+        let newScore = currentScore;
+        if (snoozed) {
+            newScore = Math.max(0, currentScore - 5);
+        } else if (isWakeUp) {
+            newScore = Math.min(100, currentScore + 2);
+        }
 
         await updateDoc(userRef, {
             'stats.totalSnoozes': snoozed ? increment(1) : increment(0),
             'stats.totalMoneyLost': increment(penaltyAmount),
-            // 'stats.disciplineScore': ... // To be implemented with more complex logic
+            'stats.disciplineScore': newScore
         });
     }
 };

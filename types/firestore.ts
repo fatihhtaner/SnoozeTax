@@ -28,7 +28,7 @@ export interface Alarm {
     isActive: boolean;
     penaltyAmount: number;
     label?: string;
-    sound?: string;
+    sound: string; // 'Classic' | 'Rain' | 'Energize'
 }
 
 export interface Transaction {

@@ -1,6 +1,7 @@
 import AlarmCard from '@/components/AlarmCard';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AlarmService } from '@/services/AlarmService';
 import { Alarm } from '@/types/firestore';
@@ -8,11 +9,14 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 export default function AlarmsScreen() {
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const { t } = useLanguage();
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? 'light'];
   const router = useRouter();
@@ -72,7 +76,7 @@ export default function AlarmsScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       <FlatList
         data={alarms}
         keyExtractor={(item) => item.id!}
@@ -86,8 +90,8 @@ export default function AlarmsScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: theme.icon }]}>No alarms set. Sleep tight!</Text>
-            <Text style={[styles.emptySubtext, { color: theme.icon }]}>Tap + to start paying for your sleep.</Text>
+            <Text style={[styles.emptyText, { color: theme.icon }]}>{t('no_alarms')}</Text>
+            <Text style={[styles.emptySubtext, { color: theme.icon }]}>{t('add_alarm_hint')}</Text>
           </View>
         }
       />
@@ -97,7 +101,7 @@ export default function AlarmsScreen() {
         onPress={handleAddAlarm}>
         <FontAwesome name="plus" size={24} color="#FFF" />
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 

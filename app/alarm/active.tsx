@@ -1,8 +1,10 @@
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AlarmService } from '@/services/AlarmService';
 import { TransactionService } from '@/services/TransactionService';
+import { UserService } from '@/services/UserService';
 import { Alarm } from '@/types/firestore';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +17,7 @@ export default function ActiveAlarmScreen() {
     const { alarmId } = useLocalSearchParams<{ alarmId: string }>();
     const router = useRouter();
     const { user } = useAuth();
+    const { t } = useLanguage();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
 
@@ -55,7 +58,13 @@ export default function ActiveAlarmScreen() {
         if (alarm?.id && alarm.repeat.length === 0) {
             await AlarmService.updateAlarm(alarm.id, { isActive: false });
         }
-        Alert.alert('Good Morning!', 'You saved money by waking up on time! ☀️');
+
+        // Reward user for waking up!
+        if (user) {
+            await UserService.updateUserStats(user.uid, 0, false, true);
+        }
+
+        Alert.alert(t('welcome'), t('wake_up_success_msg'));
         router.replace('/(tabs)');
     };
 
@@ -94,7 +103,7 @@ export default function ActiveAlarmScreen() {
 
         } catch (error) {
             setIsProcessing(false);
-            Alert.alert('Error', 'Transaction failed.');
+            Alert.alert(t('error'), t('transaction_failed'));
             setShowPaymentModal(false);
         }
     };
@@ -107,10 +116,6 @@ export default function ActiveAlarmScreen() {
 
     // Safe check for penalty amount to avoid crash
     const penalty = alarm?.penaltyAmount || 0;
-
-    // Gradient Colors based on mode, but Active screen always "Sunrise" feeling
-    const gradientColors = ['#0F2027', '#203A43', '#2C5364'];
-    const sunriseColors = ['#FF512F', '#DD2476']; // Vibrant Sunrise
 
     return (
         <LinearGradient
@@ -149,8 +154,8 @@ export default function ActiveAlarmScreen() {
                             style={styles.gradientButton}
                             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                         >
-                            <Text style={styles.wakeUpText}>I'M UP!</Text>
-                            <Text style={styles.subText}>Stop Alarm</Text>
+                            <Text style={styles.wakeUpText}>{t('im_up')}</Text>
+                            <Text style={styles.subText}>{t('stop_alarm')}</Text>
                         </LinearGradient>
                     </TouchableOpacity>
 
@@ -158,7 +163,7 @@ export default function ActiveAlarmScreen() {
                         style={styles.snoozeButton}
                         onPress={handleSnoozePress}>
                         <Text style={styles.snoozeText}>
-                            SNOOZE (${penalty.toFixed(2)})
+                            {t('snooze').toUpperCase()} (${penalty.toFixed(2)})
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -175,19 +180,19 @@ export default function ActiveAlarmScreen() {
                             {!isSuccess ? (
                                 <>
                                     <View style={styles.modalHeader}>
-                                        <Text style={styles.modalTitle}>Payment Required</Text>
+                                        <Text style={styles.modalTitle}>{t('payment_required')}</Text>
                                         <TouchableOpacity onPress={cancelPayment} disabled={isProcessing}>
                                             <FontAwesome name="close" size={24} color="#999" />
                                         </TouchableOpacity>
                                     </View>
 
                                     <View style={styles.priceContainer}>
-                                        <Text style={styles.priceLabel}>Snooze Penalty</Text>
+                                        <Text style={styles.priceLabel}>{t('penalty_label')}</Text>
                                         <Text style={styles.priceValue}>${penalty.toFixed(2)}</Text>
                                     </View>
 
                                     <Text style={styles.warningText}>
-                                        You are about to pay to sleep 9 more minutes.
+                                        {t('payment_warning')}
                                     </Text>
 
                                     <TouchableOpacity
@@ -198,18 +203,18 @@ export default function ActiveAlarmScreen() {
                                         {isProcessing ? (
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                                 <ActivityIndicator color="#FFF" />
-                                                <Text style={styles.payButtonText}>Processing...</Text>
+                                                <Text style={styles.payButtonText}>{t('processing')}</Text>
                                             </View>
                                         ) : (
-                                            <Text style={styles.payButtonText}>Pay Now</Text>
+                                            <Text style={styles.payButtonText}>{t('pay_now')}</Text>
                                         )}
                                     </TouchableOpacity>
                                 </>
                             ) : (
                                 <View style={styles.successContainer}>
                                     <FontAwesome name="check-circle" size={60} color="#4CAF50" />
-                                    <Text style={styles.successTitle}>Payment Successful</Text>
-                                    <Text style={styles.successSub}>Alarm snoozed for 9 minutes.</Text>
+                                    <Text style={styles.successTitle}>{t('payment_successful')}</Text>
+                                    <Text style={styles.successSub}>{t('snooze_success_msg')}</Text>
                                 </View>
                             )}
                         </View>

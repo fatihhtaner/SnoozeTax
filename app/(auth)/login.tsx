@@ -1,11 +1,12 @@
 import { auth } from '@/config/firebaseConfig';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import I18n from '@/i18n/i18n';
+import { i18n as I18n } from '@/i18n/i18n';
 import { Link, useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
     const [email, setEmail] = useState('');
@@ -33,55 +34,57 @@ export default function LoginScreen() {
     };
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={[styles.container, { backgroundColor: theme.background }]}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1, justifyContent: 'center' }}>
 
-            <View style={styles.header}>
-                <Text style={[styles.title, { color: theme.primary }]}>SnoozeTax</Text>
-                <Text style={[styles.subtitle, { color: theme.text }]}>{I18n.t('welcome')}</Text>
-            </View>
-
-            <View style={styles.form}>
-                <TextInput
-                    style={[styles.input, { color: theme.text, borderColor: theme.icon, backgroundColor: theme.background === '#0F2027' ? '#1A2E35' : '#FFFFFF' }]}
-                    placeholder="Email"
-                    placeholderTextColor={theme.icon}
-                    value={email}
-                    onChangeText={setEmail}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                />
-                <TextInput
-                    style={[styles.input, { color: theme.text, borderColor: theme.icon, backgroundColor: theme.background === '#0F2027' ? '#1A2E35' : '#FFFFFF' }]}
-                    placeholder="Password"
-                    placeholderTextColor={theme.icon}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                />
-
-                <TouchableOpacity
-                    style={[styles.button, { backgroundColor: theme.primary }]}
-                    onPress={handleLogin}
-                    disabled={loading}>
-                    {loading ? (
-                        <ActivityIndicator color="#FFF" />
-                    ) : (
-                        <Text style={styles.buttonText}>Sign In</Text>
-                    )}
-                </TouchableOpacity>
-
-                <View style={styles.footer}>
-                    <Text style={{ color: theme.text }}>Don't have an account? </Text>
-                    <Link href="/(auth)/sign-up" asChild>
-                        <TouchableOpacity>
-                            <Text style={{ color: theme.primary, fontWeight: 'bold' }}>Sign Up</Text>
-                        </TouchableOpacity>
-                    </Link>
+                <View style={styles.header}>
+                    <Text style={[styles.title, { color: theme.primary }]}>SnoozeTax</Text>
+                    <Text style={[styles.subtitle, { color: theme.text }]}>{I18n.t('welcome')}</Text>
                 </View>
-            </View>
-        </KeyboardAvoidingView>
+
+                <View style={styles.form}>
+                    <TextInput
+                        style={[styles.input, { color: theme.text, borderColor: theme.icon, backgroundColor: theme.background === '#0F2027' ? '#1A2E35' : '#FFFFFF' }]}
+                        placeholder="Email"
+                        placeholderTextColor={theme.icon}
+                        value={email}
+                        onChangeText={setEmail}
+                        autoCapitalize="none"
+                        keyboardType="email-address"
+                    />
+                    <TextInput
+                        style={[styles.input, { color: theme.text, borderColor: theme.icon, backgroundColor: theme.background === '#0F2027' ? '#1A2E35' : '#FFFFFF' }]}
+                        placeholder="Password"
+                        placeholderTextColor={theme.icon}
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry
+                    />
+
+                    <TouchableOpacity
+                        style={[styles.button, { backgroundColor: theme.primary }]}
+                        onPress={handleLogin}
+                        disabled={loading}>
+                        {loading ? (
+                            <ActivityIndicator color="#FFF" />
+                        ) : (
+                            <Text style={styles.buttonText}>Sign In</Text>
+                        )}
+                    </TouchableOpacity>
+
+                    <View style={styles.footer}>
+                        <Text style={{ color: theme.text }}>Don't have an account? </Text>
+                        <Link href="/(auth)/sign-up" asChild>
+                            <TouchableOpacity>
+                                <Text style={{ color: theme.primary, fontWeight: 'bold' }}>Sign Up</Text>
+                            </TouchableOpacity>
+                        </Link>
+                    </View>
+                </View>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 }
 

@@ -7,6 +7,7 @@ import 'react-native-reanimated';
 
 import { Colors } from '@/constants/Colors';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { LanguageProvider } from '@/context/LanguageContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
@@ -47,11 +48,16 @@ function RootLayoutNav() {
     if (loading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inTabsGroup = segments[0] === '(tabs)';
+    const inAlarmGroup = segments[0] === 'alarm';
 
-    if (!user && !inAuthGroup) {
-      router.replace('/(auth)/login');
-    } else if (user && inAuthGroup) {
+    if (user && !inTabsGroup && !inAlarmGroup) {
+      // User is logged in, but not in tabs or alarm group.
+      // E.g. root / or auth pages.
       router.replace('/(tabs)');
+    } else if (!user && !inAuthGroup) {
+      // User is not logged in, and not in auth group (e.g. root /, or tabs)
+      router.replace('/(auth)/login');
     }
   }, [user, loading, segments]);
 
@@ -70,6 +76,8 @@ function RootLayoutNav() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="alarm/active" options={{ headerShown: false }} />
+        <Stack.Screen name="alarm/editor" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
@@ -78,8 +86,10 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
+    </LanguageProvider>
   );
 }

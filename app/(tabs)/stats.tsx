@@ -1,5 +1,6 @@
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { UserService } from '@/services/UserService';
 import { User } from '@/types/firestore';
@@ -8,11 +9,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function StatsScreen() {
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
     const { user } = useAuth();
+    const { t } = useLanguage();
     const [profile, setProfile] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -49,50 +52,52 @@ export default function StatsScreen() {
     const score = profile?.stats.disciplineScore || 100;
 
     return (
-        <ScrollView
-            contentContainerStyle={[styles.scrollContent, { backgroundColor: theme.background }]}
-            refreshControl={<RefreshControl refreshing={loading} onRefresh={loadStats} />}
-        >
-            <View style={styles.header}>
-                <Text style={[styles.title, { color: theme.text }]}>Dashboard</Text>
-                <Text style={[styles.subtitle, { color: theme.icon }]}>Track your progress & losses.</Text>
-            </View>
-
-            {/* Main Card */}
-            <LinearGradient
-                colors={theme.sunriseGradient}
-                style={styles.mainCard}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+            <ScrollView
+                contentContainerStyle={[styles.scrollContent, { backgroundColor: theme.background }]}
+                refreshControl={<RefreshControl refreshing={loading} onRefresh={loadStats} />}
             >
-                <Text style={styles.cardLabel}>TOTAL LOST</Text>
-                <Text style={styles.cardValue}>${totalLost.toFixed(2)}</Text>
-                <Text style={styles.cardSub}>Money literally slept away.</Text>
-            </LinearGradient>
-
-            {/* Grid Stats */}
-            <View style={styles.grid}>
-                <View style={[styles.statBox, { borderColor: theme.border, backgroundColor: theme.background === '#0F2027' ? '#1A2E35' : '#FFF' }]}>
-                    <FontAwesome name="bell-o" size={24} color={theme.primary} style={{ marginBottom: 8 }} />
-                    <Text style={[styles.statValue, { color: theme.text }]}>{totalSnoozes}</Text>
-                    <Text style={[styles.statLabel, { color: theme.icon }]}>Snoozes</Text>
+                <View style={styles.header}>
+                    <Text style={[styles.title, { color: theme.text }]}>{t('dashboard_title')}</Text>
+                    <Text style={[styles.subtitle, { color: theme.icon }]}>{t('dashboard_subtitle')}</Text>
                 </View>
 
-                <View style={[styles.statBox, { borderColor: theme.border, backgroundColor: theme.background === '#0F2027' ? '#1A2E35' : '#FFF' }]}>
-                    <FontAwesome name="trophy" size={24} color={theme.accent} style={{ marginBottom: 8 }} />
-                    <Text style={[styles.statValue, { color: theme.text }]}>{score}</Text>
-                    <Text style={[styles.statLabel, { color: theme.icon }]}>Score</Text>
+                {/* Main Card */}
+                <LinearGradient
+                    colors={theme.sunriseGradient as [string, string, ...string[]]}
+                    style={styles.mainCard}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                >
+                    <Text style={styles.cardLabel}>{t('total_lost')}</Text>
+                    <Text style={styles.cardValue}>${totalLost.toFixed(2)}</Text>
+                    <Text style={styles.cardSub}>{t('money_slept_away')}</Text>
+                </LinearGradient>
+
+                {/* Grid Stats */}
+                <View style={styles.grid}>
+                    <View style={[styles.statBox, { borderColor: theme.border, backgroundColor: theme.background === '#0F2027' ? '#1A2E35' : '#FFF' }]}>
+                        <FontAwesome name="bell-o" size={24} color={theme.primary} style={{ marginBottom: 8 }} />
+                        <Text style={[styles.statValue, { color: theme.text }]}>{totalSnoozes}</Text>
+                        <Text style={[styles.statLabel, { color: theme.icon }]}>{t('snoozes')}</Text>
+                    </View>
+
+                    <View style={[styles.statBox, { borderColor: theme.border, backgroundColor: theme.background === '#0F2027' ? '#1A2E35' : '#FFF' }]}>
+                        <FontAwesome name="trophy" size={24} color={theme.accent} style={{ marginBottom: 8 }} />
+                        <Text style={[styles.statValue, { color: theme.text }]}>{score}</Text>
+                        <Text style={[styles.statLabel, { color: theme.icon }]}>{t('score')}</Text>
+                    </View>
                 </View>
-            </View>
 
-            <View style={[styles.motivationBox, { backgroundColor: theme.deepBlue }]}>
-                <Text style={styles.motivationTitle}>Keep going!</Text>
-                <Text style={styles.motivationText}>
-                    Every morning you wake up on time, you are saving money and building discipline.
-                </Text>
-            </View>
+                <View style={[styles.motivationBox, { backgroundColor: theme.deepBlue }]}>
+                    <Text style={styles.motivationTitle}>{t('motivation_title')}</Text>
+                    <Text style={styles.motivationText}>
+                        {t('motivation_text')}
+                    </Text>
+                </View>
 
-        </ScrollView>
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 

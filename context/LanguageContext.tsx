@@ -22,8 +22,12 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
                 setLocaleState(stored as Language);
                 i18n.locale = stored;
             } else {
-                // Default initialized in i18n.ts, verify consistency
-                setLocaleState(i18n.locale as Language || 'en');
+                const systemLocale = i18n.locale.split('-')[0]; // Handle en-US etc
+                const supportedLanguages = ['en', 'tr', 'de', 'fr', 'es'];
+                const initialLocale = supportedLanguages.includes(systemLocale) ? systemLocale : 'en';
+
+                setLocaleState(initialLocale as Language);
+                i18n.locale = initialLocale;
             }
         };
         loadLanguage();

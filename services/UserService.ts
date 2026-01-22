@@ -1,6 +1,6 @@
 import { db } from '@/config/firebaseConfig';
 import { User } from '@/types/firestore';
-import { doc, getDoc, increment, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, increment, setDoc, updateDoc } from 'firebase/firestore';
 
 export const UserService = {
     /**
@@ -79,5 +79,13 @@ export const UserService = {
             'stats.totalMoneyLost': increment(penaltyAmount),
             'stats.disciplineScore': newScore
         });
+    },
+
+    /**
+     * Deletes the user document from Firestore.
+     */
+    async deleteUser(uid: string) {
+        const userRef = doc(db, 'users', uid);
+        await deleteDoc(userRef);
     }
 };

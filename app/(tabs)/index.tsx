@@ -1,4 +1,6 @@
 import AlarmCard from '@/components/AlarmCard';
+import GlassCard from '@/components/GlassCard';
+import GradientBackground from '@/components/GradientBackground';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -6,6 +8,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AlarmService } from '@/services/AlarmService';
 import { Alarm } from '@/types/firestore';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -51,57 +54,62 @@ export default function AlarmsScreen() {
     }
   };
 
-  const handlePressAlarm = (alarm: Alarm) => {
-    // Navigate to editor with generic param (we'll implement params handling in editor)
-    router.push({ pathname: "/alarm/editor", params: { id: alarm.id } });
+  const handleAlarmPress = (alarm: Alarm) => {
+    router.push({
+      pathname: '/alarm/editor',
+      params: { alarmId: alarm.id }
+    });
   };
 
-  const handleAddAlarm = () => {
-    router.push("/alarm/editor");
-  };
-
-  const handleTestTrigger = (alarm: Alarm) => {
-    // Navigate to active alarm screen to simulate trigger
-    if (alarm.id) {
-      router.push({ pathname: "/alarm/active", params: { alarmId: alarm.id } });
-    }
-  };
-
-  if (loading && alarms.length === 0) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
-    );
-  }
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <GlassCard style={styles.emptyCard}>
+        <FontAwesome name="bell-slash-o" size={64} color="rgba(255, 255, 255, 0.6)" />
+        <Text style={styles.emptyText}>{t('no_alarms')}</Text>
+        <Text style={styles.emptySubtext}>{t('tap_plus_to_create')}</Text>
+      </GlassCard>
+    </View>
+  );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
-      <FlatList
-        data={alarms}
-        keyExtractor={(item) => item.id!}
-        renderItem={({ item }) => (
-          <AlarmCard
-            alarm={item}
-            onToggleActive={handleToggleActive}
-            onPress={handlePressAlarm}
-            onTestTrigger={handleTestTrigger}
+    <GradientBackground>
+      <SafeAreaView style={styles.container}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#CBF3F0" />
+          </View>
+        ) : (
+          <FlatList
+            data={alarms}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <AlarmCard
+                alarm={item}
+                onPress={handleAlarmPress}
+                onToggleActive={handleToggleActive}
+              />
+            )}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={renderEmptyState}
+            showsVerticalScrollIndicator={false}
           />
         )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: theme.icon }]}>{t('no_alarms')}</Text>
-            <Text style={[styles.emptySubtext, { color: theme.icon }]}>{t('add_alarm_hint')}</Text>
-          </View>
-        }
-      />
 
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: theme.primary }]}
-        onPress={handleAddAlarm}>
-        <FontAwesome name="plus" size={24} color="#FFF" />
-      </TouchableOpacity>
-    </SafeAreaView>
+        {/* FAB - Floating Action Button */}
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => router.push('/alarm/editor')}
+          activeOpacity={0.8}>
+          <LinearGradient
+            colors={['#2EC4B6', '#CBF3F0']}
+            style={styles.fabGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}>
+            <FontAwesome name="plus" size={24} color="#0F2027" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </SafeAreaView>
+    </GradientBackground>
   );
 }
 
@@ -109,33 +117,55 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    width: '100%',
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginTop: 24,
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: 14,
-    opacity: 0.7,
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
   },
   fab: {
     position: 'absolute',
-    right: 20,
-    bottom: 20,
+    right: 24,
+    bottom: 24,
+    borderRadius: 30,
+    shadowColor: '#2EC4B6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  fabGradient: {
     width: 60,
     height: 60,
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
   },
 });

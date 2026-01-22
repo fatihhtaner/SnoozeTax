@@ -1,33 +1,41 @@
-import { Colors } from '@/constants/Colors';
+import GradientBackground from '@/components/GradientBackground';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AlarmService } from '@/services/AlarmService';
 import { TransactionService } from '@/services/TransactionService';
 import { UserService } from '@/services/UserService';
 import { Alarm } from '@/types/firestore';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import * as InAppPurchases from 'expo-in-app-purchases';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Modal, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+// IMPORTANT: These IDs normally come from App Store Connect.
+// Since you haven't created them yet, this list is primarily for reference logic.
+// In a real build, we fetch these from Apple.
+const TIER_IDS = [
+    'com.anonymous.snoozetax.tier1',
+    'com.anonymous.snoozetax.tier2',
+    'com.anonymous.snoozetax.tier3',
+    'com.anonymous.snoozetax.tier4',
+];
 
 export default function ActiveAlarmScreen() {
     const { alarmId } = useLocalSearchParams<{ alarmId: string }>();
     const router = useRouter();
     const { user } = useAuth();
-    const { t } = useLanguage();
-    const colorScheme = useColorScheme();
-    const theme = Colors[colorScheme ?? 'light'];
+    const { t, locale } = useLanguage();
 
     const [alarm, setAlarm] = useState<Alarm | null>(null);
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    // Payment State
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    // IAP State
     const [isProcessing, setIsProcessing] = useState(false);
-    const [isSuccess, setIsSuccess] = useState(false);
+
+    // Success Modal State
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -40,12 +48,47 @@ export default function ActiveAlarmScreen() {
         }
     }, [alarmId, user]);
 
+    // Initialize IAP 
+    useEffect(() => {
+        setupIAP();
+        return () => {
+            // Disconnect typically not strictly necessary in functional components but good practice if supported
+            // InAppPurchases.disconnectAsync(); 
+        };
+    }, []);
+
+    const setupIAP = async () => {
+        try {
+            await InAppPurchases.connectAsync();
+            // In a real app, you would fetch products here:
+            // await InAppPurchases.getProductsAsync(TIER_IDS);
+
+            // Set Listener
+            InAppPurchases.setPurchaseListener(({ responseCode, results, errorCode }) => {
+                if (responseCode === InAppPurchases.IAPResponseCode.OK) {
+                    results.forEach(purchase => {
+                        if (!purchase.acknowledged) {
+                            // "Consume" the product so it can be bought again
+                            InAppPurchases.finishTransactionAsync(purchase, true);
+                            handlePaymentSuccess();
+                        }
+                    });
+                } else if (responseCode === InAppPurchases.IAPResponseCode.USER_CANCELED) {
+                    setIsProcessing(false);
+                } else {
+                    console.warn(`IAP Error ${errorCode}`);
+                    setIsProcessing(false);
+                    // Failure handled in snoozePress
+                }
+            });
+
+        } catch (error) {
+            console.error("IAP Setup Error: ", error); // Likely due to simulator
+        }
+    };
+
     const loadAlarm = async (id: string) => {
         try {
-            // In a real app we'd get single doc, here re-using getUserAlarms for simplicity in MVP 
-            // or we can implement getAlarm in service.
-            // For now, let's just fetch all and find (or better, implement getAlarm).
-            // Let's assume we implement getAlarm or just fetch user alarms.
             const alarms = await AlarmService.getUserAlarms(user!.uid);
             const found = alarms.find(a => a.id === id);
             if (found) setAlarm(found);
@@ -54,31 +97,42 @@ export default function ActiveAlarmScreen() {
         }
     };
 
-    const handleWakeUp = async () => {
-        if (alarm?.id && alarm.repeat.length === 0) {
-            await AlarmService.updateAlarm(alarm.id, { isActive: false });
-        }
-
-        // Reward user for waking up!
-        if (user) {
-            await UserService.updateUserStats(user.uid, 0, false, true);
-        }
-
-        Alert.alert(t('welcome'), t('wake_up_success_msg'));
-        router.replace('/(tabs)');
-    };
-
-    const handleSnoozePress = () => {
-        setShowPaymentModal(true);
-    };
-
-    const processPayment = async () => {
+    const handleSnoozePress = async () => {
         if (!alarm || !user) return;
-
         setIsProcessing(true);
 
-        // Artificial Friction: Wait 3 seconds to simulate "Charging Card"
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        const tierId = alarm.tierId; // e.g. 'com.anonymous.snoozetax.tier1'
+
+        try {
+            if (tierId) {
+                // Attempt Real Purchase
+                await InAppPurchases.purchaseItemAsync(tierId);
+                // The rest happens in setPurchaseListener
+            } else {
+                // Fallback for old alarms (Mock Success for standard penalty)
+                // Or if we decide to allow "Mock" on Simulator where IAP fails:
+                // throw new Error("Simulator Fallback"); // Uncomment to force mock
+
+                Alert.alert('Configuration Error', 'This alarm has no payment tier associated (Old version?).');
+                setIsProcessing(false);
+            }
+        } catch (error) {
+            console.log("Purchase Error / Simulator Fallback:", error);
+            // On Simulator, purchaseItemAsync often fails or hangs. 
+            // We simulate success here for Development purposes so you can test the UI.
+            if (__DEV__) {
+                Alert.alert("Dev Mode", "Simulating successful purchase (IAP not available on Simulator).", [
+                    { text: "OK", onPress: () => handlePaymentSuccess() }
+                ]);
+            } else {
+                Alert.alert('Error', 'Payment could not be initiated.');
+                setIsProcessing(false);
+            }
+        }
+    };
+
+    const handlePaymentSuccess = async () => {
+        if (!alarm || !user) return;
 
         try {
             await TransactionService.recordTransaction(
@@ -93,35 +147,36 @@ export default function ActiveAlarmScreen() {
             }
 
             setIsProcessing(false);
-            setIsSuccess(true);
-
-            // Wait a moment to show success state
-            setTimeout(() => {
-                setShowPaymentModal(false);
-                router.replace('/(tabs)');
-            }, 1500);
+            Alert.alert('Snoozed!', 'Payment successful. Alarm snoozed for 9 minutes.');
+            router.replace('/(tabs)');
 
         } catch (error) {
+            console.error(error);
             setIsProcessing(false);
-            Alert.alert(t('error'), t('transaction_failed'));
-            setShowPaymentModal(false);
         }
     };
 
-    const cancelPayment = () => {
-        if (!isProcessing && !isSuccess) {
-            setShowPaymentModal(false);
+    const handleWakeUp = async () => {
+        if (alarm?.id && alarm.repeat.length === 0) {
+            await AlarmService.updateAlarm(alarm.id, { isActive: false });
         }
+
+        if (user) {
+            await UserService.updateUserStats(user.uid, 0, false, true);
+        }
+
+        setShowSuccessModal(true);
+
+        setTimeout(() => {
+            setShowSuccessModal(false);
+            router.replace('/(tabs)');
+        }, 2500);
     };
 
-    // Safe check for penalty amount to avoid crash
     const penalty = alarm?.penaltyAmount || 0;
 
     return (
-        <LinearGradient
-            colors={['#16222A', '#3A6073']} // Deep Blue Morning Gradient
-            style={styles.container}
-        >
+        <GradientBackground>
             <SafeAreaView style={styles.safeArea}>
                 <Stack.Screen options={{ headerShown: false }} />
 
@@ -135,10 +190,10 @@ export default function ActiveAlarmScreen() {
                         </LinearGradient>
                     </View>
                     <Text style={styles.time}>
-                        {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {currentTime.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
                     </Text>
                     <Text style={styles.date}>
-                        {currentTime.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+                        {currentTime.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' })}
                     </Text>
                     {alarm?.label && (
                         <Text style={styles.label}>{alarm.label}</Text>
@@ -161,68 +216,51 @@ export default function ActiveAlarmScreen() {
 
                     <TouchableOpacity
                         style={styles.snoozeButton}
-                        onPress={handleSnoozePress}>
-                        <Text style={styles.snoozeText}>
-                            {t('snooze').toUpperCase()} (${penalty.toFixed(2)})
-                        </Text>
+                        onPress={handleSnoozePress}
+                        disabled={isProcessing}
+                    >
+                        {isProcessing ? (
+                            <ActivityIndicator color="#FF6B6B" />
+                        ) : (
+                            <Text style={styles.snoozeText}>
+                                {t('snooze').toUpperCase()} (${penalty.toFixed(2)})
+                            </Text>
+                        )}
                     </TouchableOpacity>
                 </View>
 
-                {/* Payment Modal */}
+                {/* Success Modal */}
                 <Modal
-                    animationType="slide"
+                    animationType="fade"
                     transparent={true}
-                    visible={showPaymentModal}
-                    onRequestClose={cancelPayment}
+                    visible={showSuccessModal}
+                    onRequestClose={() => setShowSuccessModal(false)}
                 >
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                            {!isSuccess ? (
-                                <>
-                                    <View style={styles.modalHeader}>
-                                        <Text style={styles.modalTitle}>{t('payment_required')}</Text>
-                                        <TouchableOpacity onPress={cancelPayment} disabled={isProcessing}>
-                                            <FontAwesome name="close" size={24} color="#999" />
-                                        </TouchableOpacity>
-                                    </View>
+                    <View style={styles.successModalOverlay}>
+                        <View style={styles.successModalContent}>
+                            <LinearGradient
+                                colors={['#CBF3F0', '#2EC4B6']}
+                                style={styles.successIconContainer}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <FontAwesome name="sun-o" size={60} color="#FFF" />
+                            </LinearGradient>
 
-                                    <View style={styles.priceContainer}>
-                                        <Text style={styles.priceLabel}>{t('penalty_label')}</Text>
-                                        <Text style={styles.priceValue}>${penalty.toFixed(2)}</Text>
-                                    </View>
+                            <Text style={styles.successModalTitle}>{t('welcome')}</Text>
+                            <Text style={styles.successModalMessage}>{t('wake_up_success_msg')}</Text>
 
-                                    <Text style={styles.warningText}>
-                                        {t('payment_warning')}
-                                    </Text>
-
-                                    <TouchableOpacity
-                                        style={[styles.payButton, isProcessing && styles.payButtonDisabled]}
-                                        onPress={processPayment}
-                                        disabled={isProcessing}
-                                    >
-                                        {isProcessing ? (
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                                <ActivityIndicator color="#FFF" />
-                                                <Text style={styles.payButtonText}>{t('processing')}</Text>
-                                            </View>
-                                        ) : (
-                                            <Text style={styles.payButtonText}>{t('pay_now')}</Text>
-                                        )}
-                                    </TouchableOpacity>
-                                </>
-                            ) : (
-                                <View style={styles.successContainer}>
-                                    <FontAwesome name="check-circle" size={60} color="#4CAF50" />
-                                    <Text style={styles.successTitle}>{t('payment_successful')}</Text>
-                                    <Text style={styles.successSub}>{t('snooze_success_msg')}</Text>
-                                </View>
-                            )}
+                            <View style={styles.celebrationContainer}>
+                                <Text style={styles.celebrationEmoji}>🎉</Text>
+                                <Text style={styles.celebrationEmoji}>☀️</Text>
+                                <Text style={styles.celebrationEmoji}>💪</Text>
+                            </View>
                         </View>
                     </View>
                 </Modal>
 
             </SafeAreaView>
-        </LinearGradient>
+        </GradientBackground>
     );
 }
 
@@ -306,89 +344,70 @@ const styles = StyleSheet.create({
         height: 60,
         borderRadius: 30,
         borderWidth: 2,
-        borderColor: '#E63946',
+        borderColor: '#FF6B6B',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(230, 57, 70, 0.15)',
+        backgroundColor: 'rgba(255, 107, 107, 0.1)',
     },
     snoozeText: {
         fontSize: 18,
         fontWeight: 'bold',
         color: '#FF6B6B',
     },
-    // Modal Styles
-    modalOverlay: {
+    // Success Modal Styles
+    successModalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        backgroundColor: '#FFF',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        padding: 30,
-        minHeight: 350,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 30,
     },
-    modalTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    priceContainer: {
+    successModalContent: {
+        backgroundColor: '#1E293B',
+        borderRadius: 30,
+        padding: 40,
         alignItems: 'center',
+        width: '85%',
+        maxWidth: 400,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    successIconContainer: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
         marginBottom: 20,
+        shadowColor: '#2EC4B6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 10,
     },
-    priceLabel: {
-        fontSize: 16,
-        color: '#666',
-        marginBottom: 5,
-    },
-    priceValue: {
-        fontSize: 48,
+    successModalTitle: {
+        fontSize: 28,
         fontWeight: 'bold',
-        color: '#333',
-    },
-    warningText: {
-        textAlign: 'center',
-        color: '#666',
-        marginBottom: 30,
-        fontSize: 16,
-    },
-    payButton: {
-        backgroundColor: '#000',
-        height: 60,
-        borderRadius: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    payButtonDisabled: {
-        backgroundColor: '#666',
-    },
-    payButtonText: {
-        color: '#FFF',
-        fontWeight: 'bold',
-        fontSize: 18,
-    },
-    successContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: 30,
-    },
-    successTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#333',
-        marginTop: 20,
+        color: '#FFFFFF',
         marginBottom: 10,
+        textAlign: 'center',
     },
-    successSub: {
+    successModalMessage: {
         fontSize: 16,
-        color: '#666',
+        color: 'rgba(255, 255, 255, 0.8)',
+        textAlign: 'center',
+        marginBottom: 20,
+        lineHeight: 24,
+    },
+    celebrationContainer: {
+        flexDirection: 'row',
+        gap: 15,
+        marginTop: 10,
+    },
+    celebrationEmoji: {
+        fontSize: 32,
     },
 });

@@ -1,3 +1,5 @@
+import GlassCard from '@/components/GlassCard';
+import GradientBackground from '@/components/GradientBackground';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -40,64 +42,69 @@ export default function StatsScreen() {
 
     if (loading && !profile) {
         return (
-            <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center' }]}>
-                <ActivityIndicator size="large" color={theme.primary} />
-            </View>
+            <GradientBackground>
+                <View style={[styles.container, { justifyContent: 'center' }]}>
+                    <ActivityIndicator size="large" color="#CBF3F0" />
+                </View>
+            </GradientBackground>
         );
     }
 
     // Calculate some derived stats
-    const totalLost = profile?.stats.totalMoneyLost || 0;
-    const totalSnoozes = profile?.stats.totalSnoozes || 0;
-    const score = profile?.stats.disciplineScore || 100;
+    const totalLost = profile?.stats?.totalMoneyLost || 0;
+    const totalSnoozes = profile?.stats?.totalSnoozes || 0;
+    const score = profile?.stats?.disciplineScore || 100;
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
-            <ScrollView
-                contentContainerStyle={[styles.scrollContent, { backgroundColor: theme.background }]}
-                refreshControl={<RefreshControl refreshing={loading} onRefresh={loadStats} />}
-            >
-                <View style={styles.header}>
-                    <Text style={[styles.title, { color: theme.text }]}>{t('dashboard_title')}</Text>
-                    <Text style={[styles.subtitle, { color: theme.icon }]}>{t('dashboard_subtitle')}</Text>
-                </View>
-
-                {/* Main Card */}
-                <LinearGradient
-                    colors={theme.sunriseGradient as [string, string, ...string[]]}
-                    style={styles.mainCard}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
+        <GradientBackground>
+            <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    refreshControl={<RefreshControl refreshing={loading} onRefresh={loadStats} tintColor="#CBF3F0" />}
                 >
-                    <Text style={styles.cardLabel}>{t('total_lost')}</Text>
-                    <Text style={styles.cardValue}>${totalLost.toFixed(2)}</Text>
-                    <Text style={styles.cardSub}>{t('money_slept_away')}</Text>
-                </LinearGradient>
-
-                {/* Grid Stats */}
-                <View style={styles.grid}>
-                    <View style={[styles.statBox, { borderColor: theme.border, backgroundColor: theme.background === '#0F2027' ? '#1A2E35' : '#FFF' }]}>
-                        <FontAwesome name="bell-o" size={24} color={theme.primary} style={{ marginBottom: 8 }} />
-                        <Text style={[styles.statValue, { color: theme.text }]}>{totalSnoozes}</Text>
-                        <Text style={[styles.statLabel, { color: theme.icon }]}>{t('snoozes')}</Text>
+                    <View style={styles.header}>
+                        <Text style={styles.title}>{t('dashboard_title')}</Text>
+                        <Text style={styles.subtitle}>{t('dashboard_subtitle')}</Text>
                     </View>
 
-                    <View style={[styles.statBox, { borderColor: theme.border, backgroundColor: theme.background === '#0F2027' ? '#1A2E35' : '#FFF' }]}>
-                        <FontAwesome name="trophy" size={24} color={theme.accent} style={{ marginBottom: 8 }} />
-                        <Text style={[styles.statValue, { color: theme.text }]}>{score}</Text>
-                        <Text style={[styles.statLabel, { color: theme.icon }]}>{t('score')}</Text>
+                    {/* Main Card */}
+                    <GlassCard style={styles.mainCard}>
+                        <LinearGradient
+                            colors={['rgba(255, 107, 107, 0.2)', 'rgba(255, 82, 82, 0.1)']}
+                            style={StyleSheet.absoluteFillObject}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        />
+                        <Text style={styles.cardLabel}>{t('total_lost')}</Text>
+                        <Text style={styles.cardValue}>${totalLost.toFixed(2)}</Text>
+                        <Text style={styles.cardSub}>{t('money_slept_away')}</Text>
+                    </GlassCard>
+
+                    {/* Grid Stats */}
+                    <View style={styles.grid}>
+                        <GlassCard style={styles.statBox}>
+                            <FontAwesome name="bell-o" size={24} color="#CBF3F0" style={{ marginBottom: 8 }} />
+                            <Text style={styles.statValue}>{totalSnoozes}</Text>
+                            <Text style={styles.statLabel}>{t('snoozes')}</Text>
+                        </GlassCard>
+
+                        <GlassCard style={styles.statBox}>
+                            <FontAwesome name="trophy" size={24} color="#FFD166" style={{ marginBottom: 8 }} />
+                            <Text style={styles.statValue}>{score}</Text>
+                            <Text style={styles.statLabel}>{t('score')}</Text>
+                        </GlassCard>
                     </View>
-                </View>
 
-                <View style={[styles.motivationBox, { backgroundColor: theme.deepBlue }]}>
-                    <Text style={styles.motivationTitle}>{t('motivation_title')}</Text>
-                    <Text style={styles.motivationText}>
-                        {t('motivation_text')}
-                    </Text>
-                </View>
+                    <GlassCard style={styles.motivationBox}>
+                        <Text style={styles.motivationTitle}>{t('motivation_title')}</Text>
+                        <Text style={styles.motivationText}>
+                            {t('motivation_text')}
+                        </Text>
+                    </GlassCard>
 
-            </ScrollView>
-        </SafeAreaView>
+                </ScrollView>
+            </SafeAreaView>
+        </GradientBackground>
     );
 }
 
@@ -118,37 +125,40 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 32,
         fontWeight: 'bold',
+        color: '#FFFFFF',
     },
     subtitle: {
         fontSize: 16,
-        opacity: 0.7,
+        color: 'rgba(255, 255, 255, 0.7)',
     },
     mainCard: {
         padding: 30,
-        borderRadius: 20,
         marginBottom: 20,
-        shadowColor: '#FF9F1C',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-        elevation: 5,
+        alignItems: 'center',
+        overflow: 'hidden',
     },
     cardLabel: {
         color: 'rgba(255,255,255,0.8)',
         fontSize: 14,
         fontWeight: '600',
         marginBottom: 5,
+        zIndex: 1,
     },
     cardValue: {
-        color: '#FFF',
+        color: '#FF6B6B',
         fontSize: 48,
         fontWeight: 'bold',
+        zIndex: 1,
+        textShadowColor: 'rgba(255, 107, 107, 0.3)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 4,
     },
     cardSub: {
-        color: 'rgba(255,255,255,0.9)',
+        color: 'rgba(255,255,255,0.7)',
         fontSize: 14,
         marginTop: 5,
         fontStyle: 'italic',
+        zIndex: 1,
     },
     grid: {
         flexDirection: 'row',
@@ -158,22 +168,22 @@ const styles = StyleSheet.create({
     statBox: {
         flex: 1,
         padding: 20,
-        borderRadius: 16,
-        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
     },
     statValue: {
         fontSize: 32,
         fontWeight: 'bold',
+        color: '#FFFFFF',
     },
     statLabel: {
         fontSize: 14,
+        color: 'rgba(255, 255, 255, 0.7)',
     },
     motivationBox: {
         padding: 25,
-        borderRadius: 16,
         marginTop: 10,
+        alignItems: 'center',
     },
     motivationTitle: {
         color: '#FFF',
@@ -185,5 +195,6 @@ const styles = StyleSheet.create({
         color: '#CBF3F0',
         fontSize: 14,
         lineHeight: 20,
+        textAlign: 'center',
     },
 });

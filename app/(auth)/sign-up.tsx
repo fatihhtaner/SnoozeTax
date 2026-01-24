@@ -198,8 +198,8 @@ export default function SignUpScreen() {
                                 </TouchableOpacity>
                             )}
 
-                            {/* Apple Sign-In (iOS only) - Requires Apple Developer Program */}
-                            {false && Platform.OS === 'ios' && (
+                            {/* Apple Sign-In (iOS only) */}
+                            {Platform.OS === 'ios' && (
                                 <TouchableOpacity
                                     style={[styles.socialButton, { backgroundColor: '#000' }]}
                                     onPress={handleAppleSignIn}

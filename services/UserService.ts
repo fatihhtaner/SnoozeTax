@@ -6,7 +6,7 @@ export const UserService = {
     /**
      * Creates a new user document in Firestore if it doesn't exist.
      */
-    async createUser(uid: string, email: string, displayName: string | null) {
+    async createUser(uid: string, email: string, displayName: string | null, photoURL?: string | null) {
         const userRef = doc(db, 'users', uid);
         const userSnap = await getDoc(userRef);
 
@@ -15,6 +15,7 @@ export const UserService = {
                 uid,
                 email,
                 displayName,
+                photoURL: photoURL || null,
                 createdAt: new Date() as any, // Firestore converts Date to Timestamp automatically on write
                 settings: {
                     currency: 'USD',
@@ -28,6 +29,23 @@ export const UserService = {
             };
             await setDoc(userRef, newUser);
             return newUser;
+        } else {
+            // Sync user profile data if it changed
+            const userData = userSnap.data() as User;
+            const updates: Partial<User> = {};
+
+            if (photoURL && userData.photoURL !== photoURL) {
+                updates.photoURL = photoURL;
+            }
+            // Also sync display name if it changed and is valid
+            if (displayName && userData.displayName !== displayName) {
+                updates.displayName = displayName;
+            }
+
+            if (Object.keys(updates).length > 0) {
+                await updateDoc(userRef, updates as any);
+                return { ...userData, ...updates };
+            }
         }
         return userSnap.data() as User;
     },
@@ -74,11 +92,28 @@ export const UserService = {
             newScore = Math.min(100, currentScore + 2);
         }
 
-        await updateDoc(userRef, {
-            'stats.totalSnoozes': snoozed ? increment(1) : increment(0),
-            'stats.totalMoneyLost': increment(penaltyAmount),
-            'stats.disciplineScore': newScore
-        });
+        if (userSnap.exists()) {
+            await updateDoc(userRef, {
+                'stats.totalSnoozes': snoozed ? increment(1) : increment(0),
+                'stats.totalMoneyLost': increment(penaltyAmount),
+                'stats.disciplineScore': newScore
+            });
+        } else {
+            // Document doesn't exist, create it with setDoc
+            await setDoc(userRef, {
+                uid,
+                createdAt: new Date(),
+                stats: {
+                    totalSnoozes: snoozed ? 1 : 0,
+                    totalMoneyLost: penaltyAmount,
+                    disciplineScore: newScore
+                },
+                settings: {
+                    currency: 'USD',
+                    defaultSnoozeTime: 9
+                }
+            }, { merge: true });
+        }
     },
 
     /**

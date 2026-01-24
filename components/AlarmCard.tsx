@@ -1,23 +1,27 @@
 import { Colors } from '@/constants/Colors';
+import { SOUNDS } from '@/constants/Sounds';
 import { useLanguage } from '@/context/LanguageContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Alarm } from '@/types/firestore';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { FontAwesome } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import GlassCard from './GlassCard';
 
 interface AlarmCardProps {
     alarm: Alarm;
     onToggleActive: (id: string, value: boolean) => void;
     onPress: (alarm: Alarm) => void;
+    onDelete?: (alarm: Alarm) => void;
     onTestTrigger?: (alarm: Alarm) => void;
 }
 
 const DAYS = [0, 1, 2, 3, 4, 5, 6];
 
-export default function AlarmCard({ alarm, onToggleActive, onPress }: AlarmCardProps) {
+export default function AlarmCard({ alarm, onToggleActive, onPress, onDelete }: AlarmCardProps) {
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
     const { t, locale } = useLanguage();
@@ -27,83 +31,130 @@ export default function AlarmCard({ alarm, onToggleActive, onPress }: AlarmCardP
 
     const activeOpacity = alarm.isActive ? 1 : 0.6;
 
-    // Active alarm gets gradient, inactive gets glass
-    const CardWrapper = alarm.isActive ? LinearGradient : View;
-    const cardProps = alarm.isActive
-        ? {
-            colors: ['rgba(46, 196, 182, 0.3)', 'rgba(203, 243, 240, 0.2)'] as [string, string],
-            start: { x: 0, y: 0 },
-            end: { x: 1, y: 1 },
+    const handleToggle = (value: boolean) => {
+        Haptics.selectionAsync();
+        onToggleActive(alarm.id!, value);
+    };
+
+    const handleDelete = () => {
+        if (onDelete) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            onDelete(alarm);
         }
-        : {};
+    };
+
+    // Common content
+    const cardContent = (
+        <View style={styles.cardContent}>
+            {/* Header Row: Time & Switch */}
+            <View style={styles.headerRow}>
+                <Text style={[styles.time, { opacity: activeOpacity }]}>
+                    {timeString}
+                </Text>
+                <Switch
+                    value={alarm.isActive}
+                    onValueChange={handleToggle}
+                    trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#2EC4B6' }}
+                    thumbColor={alarm.isActive ? '#CBF3F0' : 'rgba(255, 255, 255, 0.8)'}
+                    ios_backgroundColor="rgba(255, 255, 255, 0.2)"
+                />
+            </View>
+
+            {/* Label */}
+            {alarm.label && (
+                <Text style={[styles.label, { opacity: activeOpacity }]}>
+                    {alarm.label}
+                </Text>
+            )}
+
+            {/* Days Row */}
+            <View style={styles.daysRow}>
+                {DAYS.map((day) => {
+                    const isSelected = alarm.repeat?.includes(day);
+                    return (
+                        <View
+                            key={day}
+                            style={[
+                                styles.dayBadge,
+                                isSelected && styles.dayBadgeActive,
+                                { opacity: activeOpacity }
+                            ]}>
+                            <Text style={[
+                                styles.dayText,
+                                isSelected && styles.dayTextActive
+                            ]}>
+                                {t(`day_short_${day}`)}
+                            </Text>
+                        </View>
+                    );
+                })}
+            </View>
+
+            {/* Footer: Sound Info & Delete */}
+            <View style={styles.footerRow}>
+                <View style={[styles.infoRow, { opacity: activeOpacity }]}>
+                    <FontAwesome name="music" size={14} color="rgba(255, 255, 255, 0.7)" />
+                    <Text style={styles.infoText}>
+                        {(() => {
+                            const soundKey = alarm.sound || 'Classic';
+                            const soundDef = SOUNDS.find(s => s.key === soundKey);
+                            return soundDef ? t(soundDef.labelKey) : soundKey;
+                        })()}
+                    </Text>
+                </View>
+
+                {onDelete && (
+                    <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={handleDelete}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                        <FontAwesome name="trash-o" size={20} color="rgba(255, 107, 107, 0.8)" />
+                    </TouchableOpacity>
+                )}
+            </View>
+        </View>
+    );
 
     return (
-        <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => onPress(alarm)}
-            style={styles.cardContainer}>
-            <GlassCard style={styles.card}>
-                <CardWrapper {...cardProps} style={styles.cardContent}>
-                    {/* Header Row: Time & Switch */}
-                    <View style={styles.headerRow}>
-                        <Text style={[styles.time, { opacity: activeOpacity }]}>
-                            {timeString}
-                        </Text>
-                        <Switch
-                            value={alarm.isActive}
-                            onValueChange={(value) => onToggleActive(alarm.id!, value)}
-                            trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#2EC4B6' }}
-                            thumbColor={alarm.isActive ? '#CBF3F0' : 'rgba(255, 255, 255, 0.8)'}
-                            ios_backgroundColor="rgba(255, 255, 255, 0.2)"
-                        />
-                    </View>
-
-                    {/* Label */}
-                    {alarm.label && (
-                        <Text style={[styles.label, { opacity: activeOpacity }]}>
-                            {alarm.label}
-                        </Text>
+        <Animated.View
+            entering={FadeInDown.delay(100).springify()}
+            layout={Layout.springify()}
+            style={styles.cardContainer}
+        >
+            <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => onPress(alarm)}
+                style={styles.touchable}
+                onLongPress={handleDelete}
+            >
+                <GlassCard style={styles.card}>
+                    {alarm.isActive ? (
+                        <LinearGradient
+                            colors={['rgba(46, 196, 182, 0.3)', 'rgba(203, 243, 240, 0.2)']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={{ flex: 1 }} // Expand to fill GlassCard
+                        >
+                            {cardContent}
+                        </LinearGradient>
+                    ) : (
+                        <View style={{ flex: 1 }}>
+                            {cardContent}
+                        </View>
                     )}
-
-                    {/* Days Row */}
-                    <View style={styles.daysRow}>
-                        {DAYS.map((day) => {
-                            const isSelected = alarm.repeatDays?.includes(day);
-                            return (
-                                <View
-                                    key={day}
-                                    style={[
-                                        styles.dayBadge,
-                                        isSelected && styles.dayBadgeActive,
-                                        { opacity: activeOpacity }
-                                    ]}>
-                                    <Text style={[
-                                        styles.dayText,
-                                        isSelected && styles.dayTextActive
-                                    ]}>
-                                        {t(`day_short_${day}`)}
-                                    </Text>
-                                </View>
-                            );
-                        })}
-                    </View>
-
-                    {/* Sound Info */}
-                    <View style={[styles.infoRow, { opacity: activeOpacity }]}>
-                        <FontAwesome name="music" size={14} color="rgba(255, 255, 255, 0.7)" />
-                        <Text style={styles.infoText}>
-                            {alarm.sound ? t(`sound_${alarm.sound.toLowerCase()}`) : t('default_sound')}
-                        </Text>
-                    </View>
-                </CardWrapper>
-            </GlassCard>
-        </TouchableOpacity>
+                </GlassCard>
+            </TouchableOpacity>
+        </Animated.View>
     );
 }
 
 const styles = StyleSheet.create({
     cardContainer: {
         marginBottom: 16,
+    },
+    touchable: {
+        borderRadius: 24,
     },
     card: {
         padding: 0,
@@ -136,7 +187,7 @@ const styles = StyleSheet.create({
     daysRow: {
         flexDirection: 'row',
         gap: 8,
-        marginBottom: 12,
+        marginBottom: 16,
     },
     dayBadge: {
         width: 36,
@@ -160,6 +211,11 @@ const styles = StyleSheet.create({
     dayTextActive: {
         color: '#CBF3F0',
     },
+    footerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
     infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -169,4 +225,9 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: 'rgba(255, 255, 255, 0.7)',
     },
+    deleteButton: {
+        padding: 8,
+        backgroundColor: 'rgba(255, 107, 107, 0.1)',
+        borderRadius: 20,
+    }
 });

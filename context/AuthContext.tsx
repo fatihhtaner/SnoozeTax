@@ -1,7 +1,8 @@
-import { auth } from '@/config/firebaseConfig';
+import { auth, db } from '@/config/firebaseConfig';
 import { UserService } from '@/services/UserService';
 import { User } from '@/types/firestore';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface AuthContextType {
@@ -37,28 +38,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     useEffect(() => {
+        let profileUnsubscribe: (() => void) | null = null;
+
         console.log('[AuthContext] Subscribing to auth state change...');
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        const authUnsubscribe = onAuthStateChanged(auth, (currentUser) => {
             console.log('[AuthContext] Auth state changed. User:', currentUser ? currentUser.uid : 'null');
             setUser(currentUser);
+
+            // Unsubscribe from previous profile listener
+            if (profileUnsubscribe) {
+                profileUnsubscribe();
+                profileUnsubscribe = null;
+            }
+
             if (currentUser) {
-                // Fetch detailed profile
-                try {
-                    console.log('[AuthContext] Fetching user profile...');
-                    const profile = await UserService.getUser(currentUser.uid);
-                    console.log('[AuthContext] Profile fetched:', profile ? 'success' : 'null');
-                    setUserProfile(profile);
-                } catch (error) {
-                    console.error('[AuthContext] Error fetching user profile:', error);
-                }
+                const userRef = doc(db, 'users', currentUser.uid);
+                profileUnsubscribe = onSnapshot(userRef,
+                    (docSnap) => {
+                        if (docSnap.exists()) {
+                            setUserProfile(docSnap.data() as User);
+                        } else {
+                            setUserProfile(null);
+                        }
+                        setLoading(false);
+                    },
+                    (error) => {
+                        console.error('[AuthContext] Profile snapshot error:', error);
+                        setLoading(false);
+                    }
+                );
             } else {
                 setUserProfile(null);
+                setLoading(false);
             }
-            console.log('[AuthContext] Setting loading to false');
-            setLoading(false);
         });
 
-        return unsubscribe;
+        return () => {
+            authUnsubscribe();
+            if (profileUnsubscribe) profileUnsubscribe();
+        };
     }, []);
 
     return (

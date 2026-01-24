@@ -7,6 +7,8 @@ Notifications.setNotificationHandler({
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
     }),
 });
 
@@ -43,18 +45,23 @@ export const NotificationService = {
      * Schedule a local notification (alarm).
      */
     async scheduleAlarm(id: string, title: string, body: string, date: Date, soundName: string = 'default') {
-        const trigger = date; // Timestamp trigger
+        // Ensure date is in the future
+        let triggerDate = new Date(date);
+        if (triggerDate.getTime() <= Date.now()) {
+            triggerDate.setDate(triggerDate.getDate() + 1);
+        }
 
-        // Note: Sound handling in Expo Notifications for iOS/Android custom sounds 
-        // requires the sound file to be bundled and linked properly.
-        // For simplicity in this demo, we use the default sound, but the field is prepared.
+        const trigger: Notifications.DateTriggerInput = {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: triggerDate,
+        };
 
         await Notifications.scheduleNotificationAsync({
             identifier: id,
             content: {
                 title,
                 body,
-                sound: soundName === 'default' ? true : `${soundName.toLowerCase()}.wav`, // Expo often needs .wav or simple name
+                sound: soundName === 'default' ? true : `${soundName.toLowerCase()}.wav`,
                 data: { alarmId: id },
             },
             trigger,

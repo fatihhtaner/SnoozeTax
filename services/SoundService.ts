@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { AudioPlayer, createAudioPlayer } from 'expo-audio';
 
 // Map sound keys to asset files.
 // IMPORTANT: You must add these audio files to your assets/sounds/ directory.
@@ -6,11 +6,6 @@ import { Audio } from 'expo-av';
 // specific files should be named: classic.wav, rain.wav, etc.
 const soundMap: { [key: string]: any } = {
     'Classic': require('@/assets/sounds/classic.wav'),
-    'Rain': require('@/assets/sounds/rain.wav'),
-    'Energize': require('@/assets/sounds/energize.wav'),
-    'Forest': require('@/assets/sounds/forest.wav'),
-    'Ocean': require('@/assets/sounds/ocean.wav'),
-    'Piano': require('@/assets/sounds/piano.wav'),
     'AlarmClockBeep': require('@/assets/sounds/alarm-clock-beep.wav'),
     'DigitalClockBeep': require('@/assets/sounds/alarm-digital-clock-beep.wav'),
     'AlarmTone': require('@/assets/sounds/alarm-tone.wav'),
@@ -45,7 +40,7 @@ const soundMap: { [key: string]: any } = {
     'WarningBuzzer': require('@/assets/sounds/warning-alarm-buzzer.wav'),
 };
 
-let soundObject: Audio.Sound | null = null;
+let player: AudioPlayer | null = null;
 
 export const SoundService = {
     /**
@@ -53,21 +48,22 @@ export const SoundService = {
      */
     async playSound(name: string) {
         try {
-            // Unload existing sound if any
-            if (soundObject) {
-                await soundObject.unloadAsync();
-                soundObject = null;
-            }
-
             const source = soundMap[name];
             if (!source) {
-                console.warn(`Sound file for ${name} not found (uncomment in SoundService.ts after adding files).`);
+                console.warn(`Sound file for ${name} not found.`);
                 return;
             }
 
-            const { sound } = await Audio.Sound.createAsync(source);
-            soundObject = sound;
-            await sound.playAsync();
+            // Remove existing player properly
+            if (player) {
+                player.remove();
+                player = null;
+            }
+
+            // Create new player and play
+            player = createAudioPlayer(source);
+            player.loop = true; // Loop alarms
+            player.play();
 
         } catch (error) {
             console.error('Failed to play sound', error);
@@ -78,10 +74,10 @@ export const SoundService = {
      * Stops the currently playing sound.
      */
     async stopSound() {
-        if (soundObject) {
-            await soundObject.stopAsync();
-            await soundObject.unloadAsync();
-            soundObject = null;
+        if (player) {
+            player.pause();
+            player.remove();
+            player = null;
         }
     }
 };

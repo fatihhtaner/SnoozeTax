@@ -1,4 +1,6 @@
+import ConfirmationModal from '@/components/ConfirmationModal';
 import GlassCard from '@/components/GlassCard';
+import GlassModal from '@/components/GlassModal';
 import GradientBackground from '@/components/GradientBackground';
 import { auth } from '@/config/firebaseConfig';
 import { useAuth } from '@/context/AuthContext';
@@ -8,7 +10,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import React, { useState } from 'react';
-import { Alert, Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ProfileScreen() {
@@ -28,46 +30,34 @@ export default function ProfileScreen() {
         }
     };
 
-    const handleDeleteAccount = async () => {
-        Alert.alert(
-            t('delete_account'),
-            t('delete_account_confirm'),
-            [
-                { text: t('cancel'), style: 'cancel' },
-                {
-                    text: t('delete'),
-                    style: 'destructive',
-                    onPress: async () => {
-                        if (auth.currentUser) {
-                            try {
-                                // Delete from Firestore
-                                await UserService.deleteUser(auth.currentUser.uid);
-                                // Delete from Auth
-                                await auth.currentUser.delete();
-                                router.replace('/(auth)/login');
-                            } catch (error: any) {
-                                console.error(error);
-                                if (error.code === 'auth/requires-recent-login') {
-                                    Alert.alert(
-                                        'Security Check Required',
-                                        'For security reasons, you need to sign in again to delete your account. Would you like to sign out now?',
-                                        [
-                                            { text: 'Cancel', style: 'cancel' },
-                                            {
-                                                text: 'Sign Out',
-                                                onPress: handleSignOut
-                                            }
-                                        ]
-                                    );
-                                } else {
-                                    Alert.alert(t('error'), 'Failed to delete account. Please try again.');
-                                }
-                            }
-                        }
-                    }
-                }
-            ]
-        );
+    const [isSecurityModalVisible, setSecurityModalVisible] = useState(false);
+    const [isDeleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+
+    const handleDeleteAccount = () => {
+        setDeleteModalVisible(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!auth.currentUser) return;
+        setDeleteLoading(true);
+        try {
+            // Delete from Firestore
+            await UserService.deleteUser(auth.currentUser.uid);
+            // Delete from Auth
+            await auth.currentUser.delete();
+            router.replace('/(auth)/login');
+        } catch (error: any) {
+            console.error(error);
+            setDeleteModalVisible(false);
+            if (error.code === 'auth/requires-recent-login') {
+                setSecurityModalVisible(true);
+            } else {
+                Alert.alert(t('error'), 'Failed to delete account. Please try again.');
+            }
+        } finally {
+            setDeleteLoading(false);
+        }
     };
 
     const languages = [
@@ -76,6 +66,11 @@ export default function ProfileScreen() {
         { code: 'de', label: 'Deutsch', icon: '🇩🇪' },
         { code: 'fr', label: 'Français', icon: '🇫🇷' },
         { code: 'es', label: 'Español', icon: '🇪🇸' },
+        { code: 'it', label: 'Italiano', icon: '🇮🇹' },
+        { code: 'pt', label: 'Português', icon: '🇵🇹' },
+        { code: 'ru', label: 'Русский', icon: '🇷🇺' },
+        { code: 'ja', label: '日本語', icon: '🇯🇵' },
+        { code: 'zh', label: '中文', icon: '🇨🇳' },
     ];
 
     const currentLangLabel = languages.find(l => l.code === locale)?.label || 'English';
@@ -88,7 +83,11 @@ export default function ProfileScreen() {
                     {/* Header / Avatar */}
                     <View style={styles.header}>
                         <View style={styles.avatarContainer}>
-                            <FontAwesome name="user" size={50} color="#CBF3F0" />
+                            {userProfile?.photoURL ? (
+                                <Image source={{ uri: userProfile.photoURL }} style={styles.avatarImage} />
+                            ) : (
+                                <FontAwesome name="user" size={50} color="#CBF3F0" />
+                            )}
                         </View>
                         <Text style={styles.name}>{userProfile?.displayName || 'User'}</Text>
                         <Text style={styles.email}>{userProfile?.email}</Text>
@@ -138,7 +137,18 @@ export default function ProfileScreen() {
                                 </View>
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={[styles.settingRow, { borderBottomColor: 'rgba(255,255,255,0.1)' }]}>
+                            <TouchableOpacity
+                                style={[styles.settingRow, { borderBottomColor: 'rgba(255,255,255,0.1)' }]}
+                                onPress={() => {
+                                    // TODO: Replace with your actual App ID from App Store Connect
+                                    const APP_ID = '6443656157'; // This is a placeholder ID (e.g., from another app or just '1234567890')
+                                    const url = `https://apps.apple.com/app/id${APP_ID}?action=write-review`;
+                                    Linking.openURL(url).catch(err => {
+                                        console.error('An error occurred', err);
+                                        Alert.alert(t('error'), 'Could not open App Store');
+                                    });
+                                }}
+                            >
                                 <View style={styles.settingLeft}>
                                     <FontAwesome name="star-o" size={20} color="#CBF3F0" />
                                     <Text style={styles.settingText}>{t('rate_app')}</Text>
@@ -185,53 +195,74 @@ export default function ProfileScreen() {
             </SafeAreaView>
 
             {/* Language Modal */}
-            < Modal visible={isLangModalVisible} animationType="fade" transparent >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Select Language</Text>
-                        {languages.map((lang) => (
-                            <TouchableOpacity
-                                key={lang.code}
-                                style={[
-                                    styles.langOption,
-                                    {
-                                        backgroundColor: locale === lang.code ? 'rgba(203, 243, 240, 0.2)' : 'transparent',
-                                        borderColor: locale === lang.code ? '#CBF3F0' : 'transparent'
-                                    }
-                                ]}
-                                onPress={() => {
-                                    setLocale(lang.code as any);
-                                    setLangModalVisible(false);
-                                }}
-                            >
-                                <Text style={{ fontSize: 24 }}>{lang.icon}</Text>
-                                <Text style={[styles.langText, { fontWeight: locale === lang.code ? 'bold' : 'normal' }]}>{lang.label}</Text>
-                                {locale === lang.code && <FontAwesome name="check" size={16} color="#CBF3F0" />}
-                            </TouchableOpacity>
-                        ))}
-                        <TouchableOpacity style={styles.closeButton} onPress={() => setLangModalVisible(false)}>
-                            <Text style={{ color: 'rgba(255,255,255,0.6)' }}>Close</Text>
+            <GlassModal
+                visible={isLangModalVisible}
+                onClose={() => setLangModalVisible(false)}
+                title={t('language')}
+            >
+                <ScrollView showsVerticalScrollIndicator={false}>
+                    {languages.map((lang) => (
+                        <TouchableOpacity
+                            key={lang.code}
+                            style={[
+                                styles.langOption,
+                                {
+                                    backgroundColor: locale === lang.code ? 'rgba(203, 243, 240, 0.2)' : 'transparent',
+                                    borderColor: locale === lang.code ? '#CBF3F0' : 'transparent'
+                                }
+                            ]}
+                            onPress={() => {
+                                setLocale(lang.code as any);
+                                setLangModalVisible(false);
+                            }}
+                        >
+                            <Text style={{ fontSize: 24 }}>{lang.icon}</Text>
+                            <Text style={[styles.langText, { fontWeight: locale === lang.code ? 'bold' : 'normal' }]}>{lang.label}</Text>
+                            {locale === lang.code && <FontAwesome name="check" size={16} color="#CBF3F0" />}
                         </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal >
+                    ))}
+                </ScrollView>
+            </GlassModal>
 
             {/* Privacy Policy Modal */}
-            <Modal visible={isPrivacyModalVisible} animationType="fade" transparent>
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { height: '80%' }]}>
-                        <Text style={styles.modalTitle}>{t('privacy_policy')}</Text>
-                        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
-                            <Text style={{ color: '#E0E0E0', fontSize: 14, lineHeight: 22 }}>
-                                {t('privacy_policy_text')}
-                            </Text>
-                        </ScrollView>
-                        <TouchableOpacity style={styles.closeButton} onPress={() => setPrivacyModalVisible(false)}>
-                            <Text style={{ color: '#CBF3F0', fontWeight: 'bold' }}>Close</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
+            <GlassModal
+                visible={isPrivacyModalVisible}
+                onClose={() => setPrivacyModalVisible(false)}
+                title={t('privacy_policy')}
+            >
+                <ScrollView style={{ flex: 1 }}>
+                    <Text style={{ color: '#E0E0E0', fontSize: 14, lineHeight: 22 }}>
+                        {t('privacy_policy_text')}
+                    </Text>
+                </ScrollView>
+            </GlassModal>
+
+            {/* Delete Account Modal - Replaced with ConfirmationModal */}
+            <ConfirmationModal
+                visible={isDeleteModalVisible}
+                onClose={() => setDeleteModalVisible(false)}
+                onConfirm={confirmDelete}
+                title={t('delete_account')}
+                message={t('delete_account_confirm')}
+                confirmText={deleteLoading ? '...' : t('delete')}
+                cancelText={t('cancel')}
+                destructive
+                loading={deleteLoading}
+            />
+
+            {/* Security Check Modal - Uses ConfirmationModal with custom texts */}
+            <ConfirmationModal
+                visible={isSecurityModalVisible}
+                onClose={() => setSecurityModalVisible(false)}
+                onConfirm={() => {
+                    setSecurityModalVisible(false);
+                    handleSignOut();
+                }}
+                title={t('security_check') || 'Security Check'}
+                message={t('requires_recent_login') || 'For your security, please sign in again to delete your account.'}
+                confirmText={t('sign_out')}
+                cancelText={t('cancel')}
+            />
         </GradientBackground >
     );
 }
@@ -250,6 +281,11 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.5,
         shadowRadius: 10,
         elevation: 5,
+        overflow: 'hidden', // Ensure image doesn't bleed fast rounded corners
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
     },
     name: { fontSize: 24, fontWeight: 'bold', marginBottom: 5, color: '#FFFFFF' },
     email: { fontSize: 16, marginBottom: 15, color: 'rgba(255, 255, 255, 0.7)' },
@@ -319,27 +355,10 @@ const styles = StyleSheet.create({
         color: 'rgba(255, 107, 107, 0.7)',
         textDecorationLine: 'underline',
     },
-    modalOverlay: {
-        flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20
-    },
-    modalContent: {
-        borderRadius: 24,
-        padding: 25,
-        backgroundColor: '#1E293B', // Dark slate blue fallback
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.5,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#FFFFFF' },
     langOption: {
         flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: 'transparent'
     },
     langText: { fontSize: 16, marginLeft: 15, flex: 1, color: '#FFFFFF' },
-    closeButton: { alignItems: 'center', marginTop: 15, padding: 10 },
     versionText: {
         textAlign: 'center',
         color: 'rgba(255,255,255,0.3)',

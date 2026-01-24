@@ -26,6 +26,7 @@ export class SocialAuthService {
     static configureGoogleSignIn() {
         GoogleSignin.configure({
             webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
+            iosClientId: '703461511477-b6s322d6m0o47p6o6lqda56bs9etlq2p.apps.googleusercontent.com',
             offlineAccess: true,
         });
     }
@@ -61,8 +62,9 @@ export class SocialAuthService {
             // Create or update user profile in Firestore
             const displayName = userInfo.data.user.name || userInfo.data.user.email?.split('@')[0] || 'User';
             const email = userInfo.data.user.email || '';
+            const photoURL = userInfo.data.user.photo;
 
-            await UserService.createUser(userCredential.user.uid, email, displayName);
+            await UserService.createUser(userCredential.user.uid, email, displayName, photoURL);
         } catch (error: any) {
             console.error('Google Sign-In Error:', error);
 
@@ -121,8 +123,9 @@ export class SocialAuthService {
                 : userCredential.user.email?.split('@')[0] || 'User';
 
             const email = appleCredential.email || userCredential.user.email || '';
+            const photoURL = userCredential.user.photoURL;
 
-            await UserService.createUser(userCredential.user.uid, email, displayName);
+            await UserService.createUser(userCredential.user.uid, email, displayName, photoURL);
         } catch (error: any) {
             if (error.code === 'ERR_REQUEST_CANCELED') {
                 // User canceled the sign-in flow

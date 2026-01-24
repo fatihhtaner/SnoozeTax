@@ -24,7 +24,8 @@ export default function StatsScreen() {
     const loadStats = async () => {
         if (!user) return;
         try {
-            setLoading(true);
+            // Only set loading if we don't have data yet to prevent layout jump
+            if (!profile) setLoading(true);
             const data = await UserService.getUser(user.uid);
             setProfile(data);
         } catch (err) {
@@ -60,7 +61,9 @@ export default function StatsScreen() {
             <SafeAreaView style={{ flex: 1 }} edges={['top']}>
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
-                    refreshControl={<RefreshControl refreshing={loading} onRefresh={loadStats} tintColor="#CBF3F0" />}
+                    contentInsetAdjustmentBehavior="never"
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={<RefreshControl refreshing={loading && !profile} onRefresh={() => { setLoading(true); loadStats(); }} tintColor="#CBF3F0" />}
                 >
                     <View style={styles.header}>
                         <Text style={styles.title}>{t('dashboard_title')}</Text>

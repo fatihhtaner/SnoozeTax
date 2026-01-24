@@ -1,43 +1,40 @@
 /**
- * Morning Clarity Theme
- * Design: Sunrise Gradients (Warm Orange/Gold) with Deep Blue backgrounds/accents.
+ * Snooze Tax Theme
+ * Design: Glassmorphism / Dark Mode with Teal Accents
  */
 
-const tintColorLight = '#FF9F1C'; // Golden Orange
-const tintColorDark = '#FF9F1C';
+const tintColorLight = '#2EC4B6';
+const tintColorDark = '#CBF3F0';
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#FFF8F0', // Soft warm white/cream
+    text: '#0F2027',
+    background: '#FFFFFF',
     tint: tintColorLight,
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
-    primary: '#FF9F1C', // Sunrise Orange
-    secondary: '#FFBF69', // Soft Sun
-    accent: '#CBF3F0', // Light Blue/Teal
-    deepBlue: '#0F2027', // Dark contrast
-    error: '#E63946', // Alert Red
-    border: '#E2E8F0', // Light Grey for borders
-    // Gradient stops (for use with expo-linear-gradient)
-    sunriseGradient: ['#FF9F1C', '#FFBF69'],
-    backgroundGradient: ['#FFF8F0', '#FFF8F0'], // For light mode, maybe plain or subtle
+    primary: '#2EC4B6', // Teal
+    secondary: '#CBF3F0', // Light Teal
+    accent: '#FF6B6B', // Red Accent/Error
+    deepBlue: '#0F2027',
+    error: '#FF6B6B',
+    border: '#CBF3F0',
+    backgroundGradient: ['#FFFFFF', '#CBF3F0'],
   },
   dark: {
-    text: '#ECEDEE',
+    text: '#FFFFFF',
     background: '#0F2027', // Deep Blue
     tint: tintColorDark,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
-    primary: '#FF9F1C',
-    secondary: '#FFBF69',
-    accent: '#2C5364',
+    primary: '#CBF3F0', // Light Teal for contrast in dark mode
+    secondary: '#2EC4B6', // Teal
+    accent: '#FF6B6B',
     deepBlue: '#0F2027',
-    error: '#E63946',
-    border: '#2C5364', // Darker border
-    sunriseGradient: ['#FF9F1C', '#FFBF69'],
-    backgroundGradient: ['#0F2027', '#203A43', '#2C5364'], // Deep Blue Gradient
+    error: '#FF6B6B',
+    border: 'rgba(255, 255, 255, 0.2)',
+    backgroundGradient: ['#0F2027', '#203A43', '#2C5364'],
   },
 };

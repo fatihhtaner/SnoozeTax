@@ -15,6 +15,7 @@ export interface User {
     uid: string;
     email: string;
     displayName: string | null;
+    photoURL?: string | null;
     createdAt: Timestamp;
     settings: UserSettings;
     stats: UserStats;
@@ -28,7 +29,10 @@ export interface Alarm {
     isActive: boolean;
     penaltyAmount: number;
     label?: string;
-    sound: string; // 'Classic' | 'Rain' | 'Energize'
+    sound: string; // 'Classic' | 'Rain' ...
+    tierId?: string;
+    createdAt?: Timestamp;
+    updatedAt?: Timestamp;
 }
 
 export interface Transaction {

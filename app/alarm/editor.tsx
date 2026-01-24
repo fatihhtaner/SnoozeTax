@@ -1,5 +1,6 @@
 import GlassCard from '@/components/GlassCard';
 import GradientBackground from '@/components/GradientBackground';
+import { SOUNDS } from '@/constants/Sounds';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { AlarmService } from '@/services/AlarmService';
@@ -11,48 +12,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Timestamp } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-const SOUNDS = [
-    { key: 'Classic', labelKey: 'sound_classic' },
-    { key: 'Rain', labelKey: 'sound_rain' },
-    { key: 'Energize', labelKey: 'sound_energize' },
-    { key: 'Forest', labelKey: 'sound_forest' },
-    { key: 'Ocean', labelKey: 'sound_ocean' },
-    { key: 'Piano', labelKey: 'sound_piano' },
-    { key: 'AlarmClockBeep', labelKey: 'sound_alarm_clock_beep' },
-    { key: 'DigitalClockBeep', labelKey: 'sound_alarm_digital_clock_beep' },
-    { key: 'AlarmTone', labelKey: 'sound_alarm_tone' },
-    { key: 'Alert', labelKey: 'sound_alert' },
-    { key: 'Battleship', labelKey: 'sound_battleship' },
-    { key: 'CasinoJackpot', labelKey: 'sound_casino_jackpot' },
-    { key: 'CasinoWin', labelKey: 'sound_casino_win' },
-    { key: 'CitySiren', labelKey: 'sound_city_alert' },
-    { key: 'ClassicShort', labelKey: 'sound_classic_short' },
-    { key: 'ClassicWinner', labelKey: 'sound_classic_winner' },
-    { key: 'Critical', labelKey: 'sound_critical' },
-    { key: 'DataScanner', labelKey: 'sound_data_scaner' },
-    { key: 'DigitalBuzzer', labelKey: 'sound_digital_buzzer' },
-    { key: 'EmergencyAlert', labelKey: 'sound_emergency_alert' },
-    { key: 'FacilityAlarm', labelKey: 'sound_facility_alarm' },
-    { key: 'Facility', labelKey: 'sound_facility' },
-    { key: 'GameNotification', labelKey: 'sound_game_notification' },
-    { key: 'InterfaceHint', labelKey: 'sound_interface_hint' },
-    { key: 'MorningClock', labelKey: 'sound_morning_clock' },
-    { key: 'RetroGame', labelKey: 'sound_retro_game' },
-    { key: 'Rooster', labelKey: 'sound_rooster' },
-    { key: 'SciFiScan', labelKey: 'sound_scanning_sci_fi' },
-    { key: 'SecurityBreach', labelKey: 'sound_security_breach' },
-    { key: 'ShortRooster', labelKey: 'sound_short_rooster' },
-    { key: 'SlotPayout', labelKey: 'sound_slot_machine_payout' },
-    { key: 'SlotWin', labelKey: 'sound_slot_machine_win' },
-    { key: 'HallAlert', labelKey: 'sound_alert_hall' },
-    { key: 'SpaceShooter', labelKey: 'sound_space_shooter' },
-    { key: 'Spaceship', labelKey: 'sound_spaceship' },
-    { key: 'StreetPublic', labelKey: 'sound_street_public' },
-    { key: 'VintageWarning', labelKey: 'sound_vintage_warning' },
-    { key: 'WarningBuzzer', labelKey: 'sound_warning_buzzer' },
-];
+
 
 // Apple App Store Connect Product IDs
 // You must create these Consumable products in App Store Connect
@@ -77,6 +40,7 @@ export default function AlarmEditorScreen() {
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(!!id);
     const [playingSound, setPlayingSound] = useState<string | null>(null);
+    const [soundModalVisible, setSoundModalVisible] = useState(false);
 
     useEffect(() => {
         // Request permissions on mount
@@ -151,8 +115,11 @@ export default function AlarmEditorScreen() {
 
             if (id) {
                 await AlarmService.updateAlarm(id, alarmData);
+                await NotificationService.cancelAlarm(id); // Cancel old one
+                await NotificationService.scheduleAlarm(id, t('wake_up') || 'Wake Up!', label || 'Time to get up!', date, sound);
             } else {
-                await AlarmService.addAlarm(user.uid, alarmData);
+                const newAlarm = await AlarmService.addAlarm(user.uid, alarmData);
+                await NotificationService.scheduleAlarm(newAlarm.id, t('wake_up') || 'Wake Up!', label || 'Time to get up!', date, sound);
             }
             router.back();
         } catch (error) {
@@ -285,45 +252,18 @@ export default function AlarmEditorScreen() {
                         </View>
                     </View>
 
-                    {/* Sound Selection */}
+                    {/* Sound Selection Row */}
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>{t('sound')}</Text>
-                        <View style={styles.soundContainer}>
-                            {SOUNDS.map((s) => (
-                                <View key={s.key} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, width: '48%' }}>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.soundButton,
-                                            sound === s.key ? styles.soundButtonActive : styles.soundButtonInactive,
-                                            { flex: 1, marginRight: 8, justifyContent: 'center', alignItems: 'center' }
-                                        ]}
-                                        onPress={() => setSound(s.key)}
-                                    >
-                                        <Text style={[
-                                            styles.soundText,
-                                            sound === s.key ? styles.soundTextActive : styles.soundTextInactive
-                                        ]}>{t(s.labelKey)}</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={{
-                                            padding: 10,
-                                            backgroundColor: playingSound === s.key ? 'rgba(255, 107, 107, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                                            borderRadius: 20,
-                                            borderWidth: 1,
-                                            borderColor: playingSound === s.key ? '#FF6B6B' : 'rgba(255, 255, 255, 0.2)'
-                                        }}
-                                        onPress={() => handlePlaySound(s.key)}
-                                    >
-                                        <FontAwesome
-                                            name={playingSound === s.key ? "stop" : "play"}
-                                            size={14}
-                                            color={playingSound === s.key ? "#FF6B6B" : "#CBF3F0"}
-                                        />
-                                    </TouchableOpacity>
-                                </View>
-                            ))}
-                        </View>
+                        <TouchableOpacity
+                            style={styles.soundSelector}
+                            onPress={() => setSoundModalVisible(true)}
+                        >
+                            <Text style={styles.soundSelectorText}>
+                                {SOUNDS.find(s => s.key === sound)?.labelKey ? t(SOUNDS.find(s => s.key === sound)!.labelKey) : sound}
+                            </Text>
+                            <FontAwesome name="chevron-right" size={16} color="rgba(255,255,255,0.6)" />
+                        </TouchableOpacity>
                     </View>
 
                     {/* Label */}
@@ -364,6 +304,60 @@ export default function AlarmEditorScreen() {
                     <View style={{ height: 40 }} />
                 </ScrollView>
             </SafeAreaView>
+            {/* Sound Selection Modal */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={soundModalVisible}
+                onRequestClose={() => setSoundModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>{t('sound')}</Text>
+                            <TouchableOpacity onPress={() => setSoundModalVisible(false)}>
+                                <FontAwesome name="close" size={24} color="#FFF" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <FlatList
+                            data={SOUNDS}
+                            keyExtractor={(item) => item.key}
+                            renderItem={({ item }) => (
+                                <View style={styles.modalItem}>
+                                    <TouchableOpacity
+                                        style={styles.modalItemSelect}
+                                        onPress={() => {
+                                            setSound(item.key);
+                                            setSoundModalVisible(false);
+                                        }}
+                                    >
+                                        <Text style={[
+                                            styles.modalItemText,
+                                            sound === item.key && styles.modalItemTextActive
+                                        ]}>
+                                            {t(item.labelKey)}
+                                        </Text>
+                                        {sound === item.key && <FontAwesome name="check" size={16} color="#CBF3F0" />}
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.modalPlayButton}
+                                        onPress={() => handlePlaySound(item.key)}
+                                    >
+                                        <FontAwesome
+                                            name={playingSound === item.key ? "stop" : "play"}
+                                            size={16}
+                                            color={playingSound === item.key ? "#FF6B6B" : "#CBF3F0"}
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                            contentContainerStyle={{ paddingBottom: 20 }}
+                        />
+                    </View>
+                </View>
+            </Modal>
         </GradientBackground>
     );
 }
@@ -539,4 +533,74 @@ const styles = StyleSheet.create({
     },
     textActive: { color: '#0F2027' },
     textInactive: { color: '#FFFFFF' },
+
+    // Modal Styles
+    soundSelector: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 15,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+    },
+    soundSelectorText: {
+        fontSize: 16,
+        color: '#FFFFFF',
+        fontWeight: '500',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        height: '80%',
+        backgroundColor: '#1E293B',
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        padding: 20,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+        paddingBottom: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.1)',
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#FFFFFF',
+    },
+    modalItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.05)',
+    },
+    modalItemSelect: {
+        flex: 1,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginRight: 15,
+    },
+    modalItemText: {
+        fontSize: 16,
+        color: '#FFFFFF',
+    },
+    modalItemTextActive: {
+        color: '#CBF3F0',
+        fontWeight: 'bold',
+    },
+    modalPlayButton: {
+        padding: 10,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 20,
+    },
 });

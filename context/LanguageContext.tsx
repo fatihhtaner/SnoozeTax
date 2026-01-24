@@ -2,7 +2,7 @@ import { i18n } from '@/i18n/i18n'; // You might need to adjust export in i18n.t
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-type Language = 'en' | 'tr' | 'de' | 'fr' | 'es';
+type Language = 'en' | 'tr' | 'de' | 'fr' | 'es' | 'it' | 'pt' | 'ru' | 'ja' | 'zh';
 
 interface LanguageContextType {
     locale: Language;
@@ -23,7 +23,7 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
                 i18n.locale = stored;
             } else {
                 const systemLocale = i18n.locale.split('-')[0]; // Handle en-US etc
-                const supportedLanguages = ['en', 'tr', 'de', 'fr', 'es'];
+                const supportedLanguages = ['en', 'tr', 'de', 'fr', 'es', 'it', 'pt', 'ru', 'ja', 'zh'];
                 const initialLocale = supportedLanguages.includes(systemLocale) ? systemLocale : 'en';
 
                 setLocaleState(initialLocale as Language);

@@ -1,13 +1,21 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, LogBox, View } from 'react-native';
 import 'react-native-reanimated';
+
+// Ignore specific warnings
+LogBox.ignoreLogs([
+  'Expo AV has been deprecated',
+]);
 
 import { Colors } from '@/constants/Colors';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { LanguageProvider } from '@/context/LanguageContext';
+import { OnboardingProvider, useOnboarding } from '@/context/OnboardingContext';
+import { ToastProvider } from '@/context/ToastContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
@@ -44,22 +52,50 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
 
-  useEffect(() => {
-    if (loading) return;
+  const { hasSeenOnboarding } = useOnboarding();
 
+  useEffect(() => {
+    // Notification Listeners
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      const alarmId = response.notification.request.content.data.alarmId;
+      if (alarmId && typeof alarmId === 'string') {
+        router.push({ pathname: '/alarm/active', params: { alarmId } });
+      }
+    });
+
+    const foregroundListener = Notifications.addNotificationReceivedListener(notification => {
+      const alarmId = notification.request.content.data.alarmId;
+      // Optionally navigate immediately if app is open
+      if (alarmId && typeof alarmId === 'string') {
+        router.push({ pathname: '/alarm/active', params: { alarmId } });
+      }
+    });
+
+    return () => {
+      responseListener.remove();
+      foregroundListener.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (loading || hasSeenOnboarding === null) return;
+
+    // ... (existing routing logic)
     const inAuthGroup = segments[0] === '(auth)';
     const inTabsGroup = segments[0] === '(tabs)';
     const inAlarmGroup = segments[0] === 'alarm';
+    const inOnboarding = segments[0] === 'onboarding';
 
-    if (user && !inTabsGroup && !inAlarmGroup) {
-      // User is logged in, but not in tabs or alarm group.
-      // E.g. root / or auth pages.
+    if (!hasSeenOnboarding && !inOnboarding) {
+      router.replace('/onboarding');
+    } else if (hasSeenOnboarding && inOnboarding) {
+      router.replace(user ? '/(tabs)' : '/(auth)/login');
+    } else if (hasSeenOnboarding && user && !inTabsGroup && !inAlarmGroup) {
       router.replace('/(tabs)');
-    } else if (!user && !inAuthGroup) {
-      // User is not logged in, and not in auth group (e.g. root /, or tabs)
+    } else if (hasSeenOnboarding && !user && !inAuthGroup) {
       router.replace('/(auth)/login');
     }
-  }, [user, loading, segments]);
+  }, [user, loading, segments, hasSeenOnboarding]);
 
   if (loading) {
     return (
@@ -78,6 +114,7 @@ function RootLayoutNav() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="alarm/active" options={{ headerShown: false }} />
         <Stack.Screen name="alarm/editor" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
@@ -88,7 +125,11 @@ export default function RootLayout() {
   return (
     <LanguageProvider>
       <AuthProvider>
-        <RootLayoutNav />
+        <OnboardingProvider>
+          <ToastProvider>
+            <RootLayoutNav />
+          </ToastProvider>
+        </OnboardingProvider>
       </AuthProvider>
     </LanguageProvider>
   );

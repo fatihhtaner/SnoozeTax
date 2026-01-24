@@ -11,7 +11,16 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.snoozetax",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.703461511477-b6s322d6m0o47p6o6lqda56bs9etlq2p"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -47,12 +56,48 @@
       "@react-native-community/datetimepicker",
       "@react-native-google-signin/google-signin",
       [
-        "@stripe/stripe-react-native",
+        "expo-notifications",
         {
-          "merchantIdentifier": "merchant.com.anonymous.snoozetax",
-          "enableGooglePay": false
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff",
+          "sounds": [
+            "./assets/sounds/alarm-clock-beep.wav",
+            "./assets/sounds/alarm-digital-clock-beep.wav",
+            "./assets/sounds/alarm-tone.wav",
+            "./assets/sounds/alert.wav",
+            "./assets/sounds/battleship.wav",
+            "./assets/sounds/casino-jackpot-alarm-and-coins.wav",
+            "./assets/sounds/casino-win-alarm-and-coins.wav",
+            "./assets/sounds/city-alert-siren-loop.wav",
+            "./assets/sounds/classic-short.wav",
+            "./assets/sounds/classic-winner.wav",
+            "./assets/sounds/classic.wav",
+            "./assets/sounds/critical.wav",
+            "./assets/sounds/data-scaner.wav",
+            "./assets/sounds/digital-clock-digital-alarm-buzzer.wav",
+            "./assets/sounds/emergency-alert-alarm.wav",
+            "./assets/sounds/facility-alarm-sound.wav",
+            "./assets/sounds/facility.wav",
+            "./assets/sounds/game-notification-wave.wav",
+            "./assets/sounds/interface-hint-notification.wav",
+            "./assets/sounds/morning-clock.wav",
+            "./assets/sounds/retro-game-emergency.wav",
+            "./assets/sounds/rooster-crowing-in-the-morning.wav",
+            "./assets/sounds/scanning-sci-fi.wav",
+            "./assets/sounds/security-facility-breach.wav",
+            "./assets/sounds/short-rooster-crowing.wav",
+            "./assets/sounds/slot-machine-payout.wav",
+            "./assets/sounds/slot-machine-win.wav",
+            "./assets/sounds/sound-alert-in-hall.wav",
+            "./assets/sounds/space-shooter.wav",
+            "./assets/sounds/spaceship.wav",
+            "./assets/sounds/street-public.wav",
+            "./assets/sounds/vintage-warning.wav",
+            "./assets/sounds/warning-alarm-buzzer.wav"
+          ]
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

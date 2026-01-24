@@ -2,6 +2,7 @@ import GradientBackground from '@/components/GradientBackground';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { AlarmService } from '@/services/AlarmService';
+import { SoundService } from '@/services/SoundService';
 import { TransactionService } from '@/services/TransactionService';
 import { UserService } from '@/services/UserService';
 import { Alarm } from '@/types/firestore';
@@ -10,16 +11,16 @@ import * as InAppPurchases from 'expo-in-app-purchases';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-// IMPORTANT: These IDs normally come from App Store Connect.
-// Since you haven't created them yet, this list is primarily for reference logic.
-// In a real build, we fetch these from Apple.
+// Product IDs from App Store Connect
 const TIER_IDS = [
-    'com.anonymous.snoozetax.tier1',
-    'com.anonymous.snoozetax.tier2',
-    'com.anonymous.snoozetax.tier3',
-    'com.anonymous.snoozetax.tier4',
+    'com.snoozetax.tier1', // Mild ($0.99)
+    'com.snoozetax.tier2', // Medium ($2.99)
+    'com.snoozetax.tier3', // Harsh ($4.99)
+    'com.snoozetax.tier4', // Nuclear ($9.99)
 ];
 
 export default function ActiveAlarmScreen() {
@@ -48,28 +49,36 @@ export default function ActiveAlarmScreen() {
         }
     }, [alarmId, user]);
 
+    // Play sound when alarm is loaded
+    useEffect(() => {
+        if (alarm?.sound) {
+            SoundService.playSound(alarm.sound);
+        }
+
+        return () => {
+            SoundService.stopSound();
+        };
+    }, [alarm]);
+
     // Initialize IAP 
     useEffect(() => {
         setupIAP();
         return () => {
-            // Disconnect typically not strictly necessary in functional components but good practice if supported
-            // InAppPurchases.disconnectAsync(); 
+            InAppPurchases.disconnectAsync();
         };
     }, []);
 
     const setupIAP = async () => {
         try {
             await InAppPurchases.connectAsync();
-            // In a real app, you would fetch products here:
-            // await InAppPurchases.getProductsAsync(TIER_IDS);
 
-            // Set Listener
+            // Set Listener for Purchase Updates
             InAppPurchases.setPurchaseListener(({ responseCode, results, errorCode }) => {
-                if (responseCode === InAppPurchases.IAPResponseCode.OK) {
-                    results.forEach(purchase => {
+                if (responseCode === InAppPurchases.IAPResponseCode.OK && results) {
+                    results.forEach(async (purchase) => {
                         if (!purchase.acknowledged) {
-                            // "Consume" the product so it can be bought again
-                            InAppPurchases.finishTransactionAsync(purchase, true);
+                            // "Consume" the product so it can be bought again (Consumable)
+                            await InAppPurchases.finishTransactionAsync(purchase, true);
                             handlePaymentSuccess();
                         }
                     });
@@ -78,16 +87,34 @@ export default function ActiveAlarmScreen() {
                 } else {
                     console.warn(`IAP Error ${errorCode}`);
                     setIsProcessing(false);
-                    // Failure handled in snoozePress
+                    Alert.alert(t('error'), 'Purchase failed. Please try again.');
                 }
             });
 
         } catch (error) {
-            console.error("IAP Setup Error: ", error); // Likely due to simulator
+            console.error("IAP Setup Error: ", error);
         }
     };
 
     const loadAlarm = async (id: string) => {
+        if (id === 'test') {
+            // Mock alarm for testing
+            setAlarm({
+                id: 'test',
+                userId: user?.uid || 'test-user',
+                time: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
+                repeat: [],
+                isActive: true,
+                penaltyAmount: 0.99,
+                tierId: 'com.snoozetax.tier1',
+                label: 'Test Alarm',
+                sound: 'Classic',
+                createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
+                updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
+            });
+            return;
+        }
+
         try {
             const alarms = await AlarmService.getUserAlarms(user!.uid);
             const found = alarms.find(a => a.id === id);
@@ -101,25 +128,21 @@ export default function ActiveAlarmScreen() {
         if (!alarm || !user) return;
         setIsProcessing(true);
 
-        const tierId = alarm.tierId; // e.g. 'com.anonymous.snoozetax.tier1'
+        const tierId = alarm.tierId; // e.g. 'com.snoozetax.tier1'
 
         try {
             if (tierId) {
                 // Attempt Real Purchase
                 await InAppPurchases.purchaseItemAsync(tierId);
-                // The rest happens in setPurchaseListener
+                // Processing continues in setPurchaseListener
             } else {
-                // Fallback for old alarms (Mock Success for standard penalty)
-                // Or if we decide to allow "Mock" on Simulator where IAP fails:
-                // throw new Error("Simulator Fallback"); // Uncomment to force mock
-
-                Alert.alert('Configuration Error', 'This alarm has no payment tier associated (Old version?).');
+                // Fallback if no tierId (should ideally not happen in prod)
+                Alert.alert('Configuration Error', 'This alarm has no payment tier associated.');
                 setIsProcessing(false);
             }
         } catch (error) {
             console.log("Purchase Error / Simulator Fallback:", error);
-            // On Simulator, purchaseItemAsync often fails or hangs. 
-            // We simulate success here for Development purposes so you can test the UI.
+            // On Simulator, purchaseItemAsync throws error. We simulate success for Dev.
             if (__DEV__) {
                 Alert.alert("Dev Mode", "Simulating successful purchase (IAP not available on Simulator).", [
                     { text: "OK", onPress: () => handlePaymentSuccess() }
@@ -133,6 +156,15 @@ export default function ActiveAlarmScreen() {
 
     const handlePaymentSuccess = async () => {
         if (!alarm || !user) return;
+
+        // Skip DB updates for test alarm
+        if (alarm.id === 'test') {
+            setIsProcessing(false);
+            Alert.alert('Snoozed!', 'Test mode: Payment successful (Simulated). Alarm snoozed for 9 minutes.');
+            await SoundService.stopSound();
+            router.replace('/(tabs)');
+            return;
+        }
 
         try {
             await TransactionService.recordTransaction(
@@ -148,6 +180,7 @@ export default function ActiveAlarmScreen() {
 
             setIsProcessing(false);
             Alert.alert('Snoozed!', 'Payment successful. Alarm snoozed for 9 minutes.');
+            await SoundService.stopSound();
             router.replace('/(tabs)');
 
         } catch (error) {
@@ -157,6 +190,17 @@ export default function ActiveAlarmScreen() {
     };
 
     const handleWakeUp = async () => {
+        if (alarm?.id === 'test') {
+            // Skip DB updates for test alarm
+            setShowSuccessModal(true);
+            setTimeout(async () => {
+                setShowSuccessModal(false);
+                await SoundService.stopSound();
+                router.replace('/(tabs)');
+            }, 2500);
+            return;
+        }
+
         if (alarm?.id && alarm.repeat.length === 0) {
             await AlarmService.updateAlarm(alarm.id, { isActive: false });
         }
@@ -167,13 +211,29 @@ export default function ActiveAlarmScreen() {
 
         setShowSuccessModal(true);
 
-        setTimeout(() => {
+        setTimeout(async () => {
             setShowSuccessModal(false);
+            await SoundService.stopSound();
             router.replace('/(tabs)');
         }, 2500);
     };
 
     const penalty = alarm?.penaltyAmount || 0;
+
+    // Pulse Animation
+    const pulseScale = useSharedValue(1);
+
+    useEffect(() => {
+        pulseScale.value = withRepeat(
+            withTiming(1.1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+            -1,
+            true
+        );
+    }, []);
+
+    const animatedSunStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: pulseScale.value }],
+    }));
 
     return (
         <GradientBackground>
@@ -181,52 +241,73 @@ export default function ActiveAlarmScreen() {
                 <Stack.Screen options={{ headerShown: false }} />
 
                 <View style={styles.topContainer}>
-                    <View style={styles.iconContainer}>
+                    <Animated.View style={[styles.iconContainer, animatedSunStyle]}>
                         <LinearGradient
                             colors={['#FF9F1C', '#FF512F']}
                             style={styles.sunIcon}
                         >
                             <FontAwesome name="sun-o" size={60} color="#FFF" />
                         </LinearGradient>
-                    </View>
+                    </Animated.View>
+
+                    <Text style={styles.date}>
+                        {currentTime.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase()}
+                    </Text>
                     <Text style={styles.time}>
                         {currentTime.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
                     </Text>
-                    <Text style={styles.date}>
-                        {currentTime.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' })}
-                    </Text>
+
                     {alarm?.label && (
-                        <Text style={styles.label}>{alarm.label}</Text>
+                        <View style={styles.labelContainer}>
+                            <Text style={styles.label}>{alarm.label}</Text>
+                        </View>
                     )}
                 </View>
 
                 <View style={styles.bottomContainer}>
                     <TouchableOpacity
+                        activeOpacity={0.8}
                         style={styles.wakeUpButton}
                         onPress={handleWakeUp}>
                         <LinearGradient
                             colors={['#CBF3F0', '#2EC4B6']}
                             style={styles.gradientButton}
-                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                         >
                             <Text style={styles.wakeUpText}>{t('im_up')}</Text>
                             <Text style={styles.subText}>{t('stop_alarm')}</Text>
                         </LinearGradient>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.snoozeButton}
-                        onPress={handleSnoozePress}
-                        disabled={isProcessing}
-                    >
-                        {isProcessing ? (
-                            <ActivityIndicator color="#FF6B6B" />
-                        ) : (
-                            <Text style={styles.snoozeText}>
-                                {t('snooze').toUpperCase()} (${penalty.toFixed(2)})
-                            </Text>
-                        )}
-                    </TouchableOpacity>
+                    <View style={styles.snoozeContainer}>
+                        <Text style={styles.penaltyLabel}>{t('penalty_label').toUpperCase()}</Text>
+                        <TouchableOpacity
+                            style={styles.snoozeButton}
+                            onPress={handleSnoozePress}
+                            disabled={isProcessing}
+                        >
+                            <LinearGradient
+                                colors={['rgba(255, 107, 107, 0.2)', 'rgba(255, 107, 107, 0.4)']}
+                                style={styles.snoozeGradient}
+                            >
+                                {isProcessing ? (
+                                    <ActivityIndicator color="#FF6B6B" />
+                                ) : (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                        <Text style={styles.snoozeText}>
+                                            {t('snooze').toUpperCase()}
+                                        </Text>
+                                        <View style={styles.priceTag}>
+                                            <Text style={styles.priceText}>-${penalty.toFixed(2)}</Text>
+                                        </View>
+                                    </View>
+                                )}
+                            </LinearGradient>
+                        </TouchableOpacity>
+                        <Text style={styles.snoozeHint}>
+                            {t('payment_warning')}
+                        </Text>
+                    </View>
                 </View>
 
                 {/* Success Modal */}
@@ -271,143 +352,181 @@ const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
         justifyContent: 'space-between',
+        paddingVertical: 20,
     },
     topContainer: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+        marginTop: 40,
     },
     iconContainer: {
-        marginBottom: 30,
+        marginBottom: 40,
         shadowColor: '#FF9F1C',
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 20,
+        shadowOpacity: 0.6,
+        shadowRadius: 30,
     },
     sunIcon: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
+        width: 140,
+        height: 140,
+        borderRadius: 70,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)'
     },
     time: {
-        fontSize: 80,
+        fontSize: 92,
         fontWeight: '200',
         color: '#FFF',
-        textShadowColor: 'rgba(0, 0, 0, 0.3)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 10
+        textShadowColor: 'rgba(0, 0, 0, 0.2)',
+        textShadowOffset: { width: 0, height: 4 },
+        textShadowRadius: 10,
+        letterSpacing: -2,
+        fontVariant: ['tabular-nums'],
     },
     date: {
-        fontSize: 20,
-        marginTop: 10,
-        color: '#EEE',
-        opacity: 0.8,
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#CBF3F0',
+        letterSpacing: 2,
+        marginBottom: 5,
+    },
+    labelContainer: {
+        marginTop: 20,
+        paddingHorizontal: 20,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     label: {
-        fontSize: 24,
-        marginTop: 20,
+        fontSize: 20,
         color: '#FFF',
-        fontStyle: 'italic',
+        fontWeight: '500',
     },
     bottomContainer: {
         padding: 30,
-        gap: 20,
+        gap: 40,
+        justifyContent: 'flex-end',
     },
     wakeUpButton: {
         height: 80,
-        borderRadius: 40,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
-        elevation: 5,
+        borderRadius: 25,
+        shadowColor: '#2EC4B6',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 15,
+        elevation: 10,
+        transform: [{ scale: 1 }],
     },
     gradientButton: {
         flex: 1,
-        borderRadius: 40,
+        borderRadius: 25,
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 15,
     },
     wakeUpText: {
         fontSize: 28,
         fontWeight: 'bold',
         color: '#0F2027',
+        letterSpacing: 1,
     },
     subText: {
-        fontSize: 14,
-        color: '#0F2027',
-        opacity: 0.8,
+        display: 'none', // Simplified layout
+    },
+    snoozeContainer: {
+        alignItems: 'center',
+        gap: 10,
+    },
+    penaltyLabel: {
+        color: 'rgba(255, 107, 107, 0.8)',
+        fontSize: 10,
+        fontWeight: 'bold',
+        letterSpacing: 1,
     },
     snoozeButton: {
-        height: 60,
-        borderRadius: 30,
-        borderWidth: 2,
-        borderColor: '#FF6B6B',
+        width: '100%',
+        height: 64,
+        borderRadius: 20,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 107, 107, 0.4)',
+    },
+    snoozeGradient: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(255, 107, 107, 0.1)',
     },
     snoozeText: {
         fontSize: 18,
         fontWeight: 'bold',
         color: '#FF6B6B',
+        letterSpacing: 1,
+    },
+    priceTag: {
+        backgroundColor: '#FF6B6B',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    priceText: {
+        color: '#FFF',
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
+    snoozeHint: {
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 11,
+        textAlign: 'center',
     },
     // Success Modal Styles
     successModalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        backgroundColor: 'rgba(0, 0, 0, 0.95)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     successModalContent: {
-        backgroundColor: '#1E293B',
-        borderRadius: 30,
-        padding: 40,
         alignItems: 'center',
-        width: '85%',
-        maxWidth: 400,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.5,
-        shadowRadius: 20,
-        elevation: 10,
+        width: '100%',
+        padding: 40,
     },
     successIconContainer: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
+        width: 120,
+        height: 120,
+        borderRadius: 60,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 20,
+        marginBottom: 30,
         shadowColor: '#2EC4B6',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 30,
     },
     successModalTitle: {
-        fontSize: 28,
+        fontSize: 32,
         fontWeight: 'bold',
         color: '#FFFFFF',
         marginBottom: 10,
         textAlign: 'center',
     },
     successModalMessage: {
-        fontSize: 16,
-        color: 'rgba(255, 255, 255, 0.8)',
+        fontSize: 18,
+        color: 'rgba(255, 255, 255, 0.7)',
         textAlign: 'center',
-        marginBottom: 20,
-        lineHeight: 24,
+        marginBottom: 40,
+        lineHeight: 28,
     },
     celebrationContainer: {
         flexDirection: 'row',
-        gap: 15,
-        marginTop: 10,
+        gap: 20,
     },
     celebrationEmoji: {
-        fontSize: 32,
+        fontSize: 40,
     },
 });

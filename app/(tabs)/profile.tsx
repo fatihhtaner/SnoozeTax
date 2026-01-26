@@ -100,7 +100,7 @@ export default function ProfileScreen() {
                             <Text style={styles.statLabel}>{t('snoozes')}</Text>
                         </GlassCard>
                         <GlassCard style={styles.statItem}>
-                            <Text style={[styles.statValue, { color: '#FF6B6B' }]}>${userProfile?.stats?.totalMoneyLost || 0}</Text>
+                            <Text style={[styles.statValue, { color: '#FF6B6B' }]}>${Number(userProfile?.stats?.totalMoneyLost || 0).toFixed(2)}</Text>
                             <Text style={styles.statLabel}>{t('lost')}</Text>
                         </GlassCard>
                     </View>

@@ -79,7 +79,7 @@ export default function StatsScreen() {
                             end={{ x: 1, y: 1 }}
                         />
                         <Text style={styles.cardLabel}>{t('total_lost')}</Text>
-                        <Text style={styles.cardValue}>${totalLost.toFixed(2)}</Text>
+                        <Text style={styles.cardValue}>${Number(totalLost).toFixed(2)}</Text>
                         <Text style={styles.cardSub}>{t('money_slept_away')}</Text>
                     </GlassCard>
 

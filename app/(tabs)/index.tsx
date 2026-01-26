@@ -53,7 +53,27 @@ export default function AlarmsScreen() {
     try {
       // Optimistic update
       setAlarms(prev => prev.map(a => a.id === id ? { ...a, isActive: value } : a));
+
+      // Update database
       await AlarmService.updateAlarm(id, { isActive: value });
+
+      // Manage notifications based on active state
+      if (value) {
+        // Alarm activated - schedule notification
+        const alarm = alarms.find(a => a.id === id);
+        if (alarm) {
+          await NotificationService.scheduleAlarm(
+            id,
+            t('wake_up') || 'Wake Up!',
+            alarm.label || t('time_to_get_up') || 'Time to get up!',
+            alarm.time.toDate(),
+            alarm.sound || 'default'
+          );
+        }
+      } else {
+        // Alarm deactivated - cancel notification
+        await NotificationService.cancelAlarm(id);
+      }
     } catch (error) {
       console.error('Failed to update alarm', error);
       loadAlarms(); // Revert on error
@@ -63,7 +83,7 @@ export default function AlarmsScreen() {
   const handleAlarmPress = (alarm: Alarm) => {
     router.push({
       pathname: '/alarm/editor',
-      params: { alarmId: alarm.id }
+      params: { id: alarm.id }
     });
   };
 

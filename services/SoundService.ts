@@ -45,6 +45,7 @@ let player: AudioPlayer | null = null;
 export const SoundService = {
     /**
      * Plays a sound by name. stops any currently playing sound.
+     * Configured for background playback with iOS background audio mode.
      */
     async playSound(name: string) {
         try {
@@ -60,9 +61,12 @@ export const SoundService = {
                 player = null;
             }
 
-            // Create new player and play
+            // Create new player
+            // Note: expo-audio automatically uses background audio mode when
+            // UIBackgroundModes: ["audio"] is set in app.json
             player = createAudioPlayer(source);
-            player.loop = true; // Loop alarms
+
+            player.loop = true; // Loop alarms continuously
             player.play();
 
         } catch (error) {

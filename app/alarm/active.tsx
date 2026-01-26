@@ -2,6 +2,7 @@ import GradientBackground from '@/components/GradientBackground';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { AlarmService } from '@/services/AlarmService';
+import { NotificationService } from '@/services/NotificationService';
 import { SoundService } from '@/services/SoundService';
 import { TransactionService } from '@/services/TransactionService';
 import { UserService } from '@/services/UserService';
@@ -71,6 +72,15 @@ export default function ActiveAlarmScreen() {
     const setupIAP = async () => {
         try {
             await InAppPurchases.connectAsync();
+        } catch (error: any) {
+            if (error.message && error.message.includes('Already connected')) {
+                // Ignore if already connected
+            } else {
+                console.error('IAP Setup Error:', error);
+            }
+        }
+
+        try {
 
             // Set Listener for Purchase Updates
             InAppPurchases.setPurchaseListener(({ responseCode, results, errorCode }) => {
@@ -162,6 +172,7 @@ export default function ActiveAlarmScreen() {
             setIsProcessing(false);
             Alert.alert('Snoozed!', 'Test mode: Payment successful (Simulated). Alarm snoozed for 9 minutes.');
             await SoundService.stopSound();
+            await NotificationService.cancelAlarm('test');
             router.replace('/(tabs)');
             return;
         }
@@ -181,6 +192,7 @@ export default function ActiveAlarmScreen() {
             setIsProcessing(false);
             Alert.alert('Snoozed!', 'Payment successful. Alarm snoozed for 9 minutes.');
             await SoundService.stopSound();
+            if (alarm.id) await NotificationService.cancelAlarm(alarm.id);
             router.replace('/(tabs)');
 
         } catch (error) {
@@ -190,12 +202,15 @@ export default function ActiveAlarmScreen() {
     };
 
     const handleWakeUp = async () => {
+        // Stop sound immediately
+        await SoundService.stopSound();
+
         if (alarm?.id === 'test') {
             // Skip DB updates for test alarm
+            await NotificationService.cancelAlarm('test');
             setShowSuccessModal(true);
             setTimeout(async () => {
                 setShowSuccessModal(false);
-                await SoundService.stopSound();
                 router.replace('/(tabs)');
             }, 2500);
             return;
@@ -209,11 +224,12 @@ export default function ActiveAlarmScreen() {
             await UserService.updateUserStats(user.uid, 0, false, true);
         }
 
+        if (alarm?.id) await NotificationService.cancelAlarm(alarm.id);
+
         setShowSuccessModal(true);
 
         setTimeout(async () => {
             setShowSuccessModal(false);
-            await SoundService.stopSound();
             router.replace('/(tabs)');
         }, 2500);
     };

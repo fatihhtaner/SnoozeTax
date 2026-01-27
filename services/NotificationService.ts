@@ -2,14 +2,20 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 // Configure how notifications behave when the app is in foreground
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-        shouldShowBanner: true,
-        shouldShowList: true,
-    }),
-});
+const setNotificationBehavior = (shouldPlaySound: boolean) => {
+    Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+            shouldPlaySound: shouldPlaySound,
+            shouldSetBadge: false,
+            shouldShowBanner: shouldPlaySound,
+            shouldShowList: shouldPlaySound,
+        }),
+    });
+};
+
+// Default behavior
+setNotificationBehavior(true);
+
 
 // Define Actions
 const SNOOZE_ACTION = 'SNOOZE_ACTION';
@@ -74,7 +80,7 @@ export const NotificationService = {
      * Schedule a local notification (alarm).
      * Schedules a sequence of notifications to simulate a continuous alarm.
      */
-    async scheduleAlarm(id: string, title: string, body: string, date: Date, soundName: string = 'default') {
+    async scheduleAlarm(id: string, title: string, body: string, date: Date, soundName: string = 'default', extraData: any = {}) {
         // Ensure date is in the future
         let triggerDate = new Date(date);
         const now = Date.now();
@@ -102,7 +108,7 @@ export const NotificationService = {
 
         const interval = isLongSound ? 3 : 2; // 3s for long, 2s for short (more frequent)
         const totalDuration = 300; // 5 minutes total
-        const count = Math.ceil(totalDuration / interval);
+        const count = Math.min(Math.ceil(totalDuration / interval), 50); // Cap at 50 to respect iOS 64 limit
 
         // Schedule notifications
         for (let i = 0; i < count; i++) {
@@ -125,7 +131,7 @@ export const NotificationService = {
                     title: i === 0 ? title : `${title} (Devam Ediyor)`,
                     body: body,
                     sound: soundFile,
-                    data: { alarmId: id },
+                    data: { alarmId: id, ...extraData },
                     interruptionLevel: 'timeSensitive',
                     categoryIdentifier: ALARM_CATEGORY,
                 },
@@ -141,14 +147,17 @@ export const NotificationService = {
      * Cancel a specific alarm notification sequence.
      */
     async cancelAlarm(id: string) {
+        console.log('[NotificationService] Cancelling alarm:', id);
         // Cancel all potential sequence notifications in parallel for speed
         const promises = [];
-        // Max possible count is 60 (if interval was 5s)
-        for (let i = 0; i < 60; i++) {
+        // Max possible count is 150 (300s / 2s interval)
+        // Using 200 to be safe
+        for (let i = 0; i < 200; i++) {
             const sequenceId = `${id}_seq_${i}`;
             promises.push(Notifications.cancelScheduledNotificationAsync(sequenceId));
         }
         await Promise.all(promises);
+        console.log('[NotificationService] Cancelled all notifications for alarm:', id);
     },
 
     /**
@@ -156,5 +165,12 @@ export const NotificationService = {
      */
     async cancelAll() {
         await Notifications.cancelAllScheduledNotificationsAsync();
+    },
+
+    /**
+     * Update foreground notification behavior (e.g. silence sound when valid alarm screen is active)
+     */
+    setForegroundBehavior(shouldPlaySound: boolean) {
+        setNotificationBehavior(shouldPlaySound);
     }
 };

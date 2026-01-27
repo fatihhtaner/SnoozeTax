@@ -54,6 +54,8 @@ export const UserService = {
      * Fetches user profile.
      */
     async getUser(uid: string) {
+        if (uid === 'guest') return null;
+
         const userRef = doc(db, 'users', uid);
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
@@ -74,6 +76,8 @@ export const UserService = {
      * Updates user stats after a snooze or alarm event.
      */
     async updateUserStats(uid: string, penaltyAmount: number = 0, snoozed: boolean = false, isWakeUp: boolean = false) {
+        if (uid === 'guest') return;
+
         const userRef = doc(db, 'users', uid);
 
         // Fetch current score to calculate new one

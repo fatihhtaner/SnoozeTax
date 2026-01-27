@@ -18,6 +18,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ConfirmationModal from '@/components/ConfirmationModal';
 
+const sortAlarms = (alarms: Alarm[]) => {
+  return [...alarms].sort((a, b) => {
+    // 1. Active first
+    if (a.isActive && !b.isActive) return -1;
+    if (!a.isActive && b.isActive) return 1;
+
+    // 2. Time comparison (Earliest first)
+    // Assuming time is a Firestore Timestamp with seconds
+    return a.time.seconds - b.time.seconds;
+  });
+};
+
 export default function AlarmsScreen() {
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,11 +43,12 @@ export default function AlarmsScreen() {
   const router = useRouter();
 
   const loadAlarms = async () => {
-    if (!user) return;
+    // if (!user) return; // Allow guest
+    const userId = user?.uid || 'guest';
     try {
       setLoading(true);
-      const userAlarms = await AlarmService.getUserAlarms(user.uid);
-      setAlarms(userAlarms);
+      const userAlarms = await AlarmService.getUserAlarms(userId);
+      setAlarms(sortAlarms(userAlarms));
     } catch (error) {
       console.error('Failed to load alarms', error);
     } finally {
@@ -52,7 +65,10 @@ export default function AlarmsScreen() {
   const handleToggleActive = async (id: string, value: boolean) => {
     try {
       // Optimistic update
-      setAlarms(prev => prev.map(a => a.id === id ? { ...a, isActive: value } : a));
+      setAlarms(prev => {
+        const updated = prev.map(a => a.id === id ? { ...a, isActive: value } : a);
+        return sortAlarms(updated);
+      });
 
       // Update database
       await AlarmService.updateAlarm(id, { isActive: value });
@@ -67,7 +83,8 @@ export default function AlarmsScreen() {
             t('wake_up') || 'Wake Up!',
             alarm.label || t('time_to_get_up') || 'Time to get up!',
             alarm.time.toDate(),
-            alarm.sound || 'default'
+            alarm.sound || 'default',
+            { penaltyAmount: alarm.penaltyAmount, sound: alarm.sound, label: alarm.label }
           );
         }
       } else {

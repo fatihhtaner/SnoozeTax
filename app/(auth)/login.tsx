@@ -1,6 +1,7 @@
 import StarBackground from '@/components/StarBackground';
 import { auth } from '@/config/firebaseConfig';
 import { Colors } from '@/constants/Colors';
+import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SocialAuthService } from '@/services/SocialAuthService';
@@ -23,6 +24,7 @@ export default function LoginScreen() {
     const [appleLoading, setAppleLoading] = useState(false);
     const router = useRouter();
     const { t } = useLanguage();
+    const { loginAsGuest } = useAuth();
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
 
@@ -155,6 +157,23 @@ export default function LoginScreen() {
                                     <View style={styles.divider} />
                                 </View>
 
+                                {/* Apple Sign-In (iOS only) */}
+                                {Platform.OS === 'ios' && (
+                                    <TouchableOpacity
+                                        style={[styles.socialButton, { backgroundColor: '#000' }]}
+                                        onPress={handleAppleSignIn}
+                                        disabled={appleLoading || loading}>
+                                        {appleLoading ? (
+                                            <ActivityIndicator color="#FFF" />
+                                        ) : (
+                                            <>
+                                                <FontAwesome name="apple" size={20} color="#FFF" style={{ marginRight: 10 }} />
+                                                <Text style={[styles.socialButtonText, { color: '#FFF' }]}>{t('continue_with_apple')}</Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                )}
+
                                 {/* Google Sign-In - Only in development build */}
                                 {__DEV__ && (
                                     <TouchableOpacity
@@ -172,22 +191,18 @@ export default function LoginScreen() {
                                     </TouchableOpacity>
                                 )}
 
-                                {/* Apple Sign-In (iOS only) */}
-                                {Platform.OS === 'ios' && (
-                                    <TouchableOpacity
-                                        style={[styles.socialButton, { backgroundColor: '#000' }]}
-                                        onPress={handleAppleSignIn}
-                                        disabled={appleLoading || loading}>
-                                        {appleLoading ? (
-                                            <ActivityIndicator color="#FFF" />
-                                        ) : (
-                                            <>
-                                                <FontAwesome name="apple" size={20} color="#FFF" style={{ marginRight: 10 }} />
-                                                <Text style={[styles.socialButtonText, { color: '#FFF' }]}>{t('continue_with_apple')}</Text>
-                                            </>
-                                        )}
-                                    </TouchableOpacity>
-                                )}
+                                {/* Guest Mode Button */}
+                                <TouchableOpacity
+                                    style={styles.guestButton}
+                                    onPress={async () => {
+                                        setLoading(true);
+                                        await loginAsGuest();
+                                        setLoading(false);
+                                    }}
+                                    disabled={loading}>
+                                    <FontAwesome name="user-secret" size={16} color="rgba(255,255,255,0.7)" style={{ marginRight: 8 }} />
+                                    <Text style={styles.guestButtonText}>{t('continue_as_guest')}</Text>
+                                </TouchableOpacity>
                             </View>
 
                             {/* Footer */}
@@ -374,5 +389,21 @@ const styles = StyleSheet.create({
         color: '#FF6B6B',
         fontSize: 14,
         flex: 1,
+    },
+    guestButton: {
+        height: 40,
+        borderRadius: 12,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 15,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    },
+    guestButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: 'rgba(255, 255, 255, 0.8)',
     },
 });

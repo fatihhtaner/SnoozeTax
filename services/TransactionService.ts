@@ -9,6 +9,8 @@ export const TransactionService = {
      * Also updates the user's total aggregate stats.
      */
     async recordTransaction(userId: string, type: 'PENALTY' | 'PAYMENT', amount: number, alarmId?: string) {
+        if (userId === 'guest') return { id: 'guest-tx', userId, type, amount, timestamp: Timestamp.now(), alarmId };
+
         const transactionsRef = collection(db, 'transactions');
 
         const newTransaction: Omit<Transaction, 'id'> = {

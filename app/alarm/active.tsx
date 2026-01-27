@@ -23,9 +23,20 @@ const TIER_IDS = [
     'com.snoozetax.tier3', // Harsh ($4.99)
     'com.snoozetax.tier4', // Nuclear ($9.99)
 ];
+const PENALTY_TIERS = [
+    { amount: 0.99 },
+    { amount: 2.99 },
+    { amount: 4.99 },
+    { amount: 9.99 },
+];
 
 export default function ActiveAlarmScreen() {
-    const { alarmId } = useLocalSearchParams<{ alarmId: string }>();
+    const { alarmId, penaltyAmount, sound, label } = useLocalSearchParams<{
+        alarmId: string,
+        penaltyAmount?: string,
+        sound?: string,
+        label?: string
+    }>();
     const router = useRouter();
     const { user } = useAuth();
     const { t, locale } = useLanguage();
@@ -46,26 +57,33 @@ export default function ActiveAlarmScreen() {
 
     useEffect(() => {
         if (alarmId && user) {
-            loadAlarm(alarmId);
+            loadAlarm(alarmId, penaltyAmount, sound, label);
         }
-    }, [alarmId, user]);
+    }, [alarmId, user, penaltyAmount, sound, label]);
 
     // Play sound when alarm is loaded
     useEffect(() => {
         if (alarm?.sound) {
+            // Silence notifications while we play sound manually
+            NotificationService.setForegroundBehavior(false);
             SoundService.playSound(alarm.sound);
         }
 
         return () => {
             SoundService.stopSound();
+            // Restore notification sound behavior
+            NotificationService.setForegroundBehavior(true);
         };
-    }, [alarm]);
+    }, [alarm?.sound]);
 
     // Initialize IAP 
     useEffect(() => {
         setupIAP();
         return () => {
-            InAppPurchases.disconnectAsync();
+            // Safely disconnect
+            InAppPurchases.disconnectAsync().catch(() => {
+                // Ignore disconnect errors (e.g. already disconnected)
+            });
         };
     }, []);
 
@@ -106,7 +124,7 @@ export default function ActiveAlarmScreen() {
         }
     };
 
-    const loadAlarm = async (id: string) => {
+    const loadAlarm = async (id: string, pAmount?: string, pSound?: string, pLabel?: string) => {
         if (id === 'test') {
             // Mock alarm for testing
             setAlarm({
@@ -125,12 +143,38 @@ export default function ActiveAlarmScreen() {
             return;
         }
 
+        // 1. Try to use offline data from notification payload first
+        if (pAmount && pSound) {
+            console.log('[ActiveAlarm] Using offline data from payload');
+            setAlarm({
+                id,
+                userId: user!.uid,
+                time: { seconds: Date.now() / 1000, nanoseconds: 0 } as any, // Placeholder
+                repeat: [],
+                isActive: true,
+                penaltyAmount: parseFloat(pAmount),
+                // Infer tierId from amount (approximate)
+                tierId: TIER_IDS.find((_, i) => PENALTY_TIERS[i].amount === parseFloat(pAmount)) || 'com.snoozetax.tier1',
+                label: pLabel || '',
+                sound: pSound,
+                createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
+                updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
+            });
+            // We can still try to fetch in background to get more up-to-date data, 
+            // but we don't block the UI.
+        }
+
+        // 2. Fetch from DB to ensure validity (and get correct ID if needed for IAP)
         try {
             const alarms = await AlarmService.getUserAlarms(user!.uid);
             const found = alarms.find(a => a.id === id);
-            if (found) setAlarm(found);
+            if (found) {
+                setAlarm(found);
+            }
         } catch (error) {
-            console.error(error);
+            console.error('Failed to fetch alarm from DB (Offline mode?)', error);
+            // If we didn't have offline params, we're in trouble. 
+            // But if we did, we already set the state above.
         }
     };
 

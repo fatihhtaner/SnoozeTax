@@ -30,6 +30,7 @@ export default function AlarmEditorScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const { user } = useAuth();
+    const userId = user?.uid || 'guest';
     const { t } = useLanguage();
 
     const [date, setDate] = useState(new Date());
@@ -70,7 +71,7 @@ export default function AlarmEditorScreen() {
 
     const loadAlarm = async (alarmId: string) => {
         try {
-            const alarms = await AlarmService.getUserAlarms(user!.uid);
+            const alarms = await AlarmService.getUserAlarms(userId);
             const alarm = alarms.find(a => a.id === alarmId);
             if (alarm) {
                 setDate(alarm.time.toDate());
@@ -99,12 +100,16 @@ export default function AlarmEditorScreen() {
     };
 
     const handleSave = async () => {
-        if (!user) return;
+        // if (!user) return; // Guest allowed
 
         setLoading(true);
         try {
+            const cleanDate = new Date(date);
+            cleanDate.setSeconds(0);
+            cleanDate.setMilliseconds(0);
+
             const alarmData = {
-                time: Timestamp.fromDate(date),
+                time: Timestamp.fromDate(cleanDate),
                 repeat,
                 isActive: true,
                 penaltyAmount: selectedTier.amount,
@@ -116,10 +121,24 @@ export default function AlarmEditorScreen() {
             if (id) {
                 await AlarmService.updateAlarm(id, alarmData);
                 await NotificationService.cancelAlarm(id); // Cancel old one
-                await NotificationService.scheduleAlarm(id, t('wake_up') || 'Wake Up!', label || 'Time to get up!', date, sound);
+                await NotificationService.scheduleAlarm(
+                    id,
+                    t('wake_up') || 'Wake Up!',
+                    label || t('time_to_get_up'),
+                    cleanDate,
+                    sound,
+                    { penaltyAmount: selectedTier.amount, sound, label }
+                );
             } else {
-                const newAlarm = await AlarmService.addAlarm(user.uid, alarmData);
-                await NotificationService.scheduleAlarm(newAlarm.id, t('wake_up') || 'Wake Up!', label || 'Time to get up!', date, sound);
+                const newAlarm = await AlarmService.addAlarm(userId, alarmData);
+                await NotificationService.scheduleAlarm(
+                    newAlarm.id,
+                    t('wake_up') || 'Wake Up!',
+                    label || t('time_to_get_up'),
+                    cleanDate,
+                    sound,
+                    { penaltyAmount: selectedTier.amount, sound, label }
+                );
             }
             router.back();
         } catch (error) {

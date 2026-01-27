@@ -51,7 +51,7 @@ const MorningDarkTheme = {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
-  const { user, loading } = useAuth();
+  const { user, loading, isGuest } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const { locale, t } = useLanguage();
@@ -128,9 +128,15 @@ function RootLayoutNav() {
         // This is safer for ensuring they actually engage with the UI (and pay if needed).
         // You could pass ?action=snooze to auto-trigger, but let's just open for now.
 
+        const data = response.notification.request.content.data as any;
+        const { penaltyAmount, sound, label } = data;
+
         console.log(`[Notification] Action: ${actionId}, Alarm: ${alarmId}`);
         isOnAlarmScreenRef.current = true;
-        router.push({ pathname: '/alarm/active', params: { alarmId } });
+        router.push({
+          pathname: '/alarm/active',
+          params: { alarmId, penaltyAmount, sound, label }
+        });
       }
     });
 
@@ -140,9 +146,14 @@ function RootLayoutNav() {
       if (alarmId && typeof alarmId === 'string') {
         // Don't navigate if already on alarm/active screen
         if (!isOnAlarmScreenRef.current) {
+          const data = notification.request.content.data as any;
+          const { penaltyAmount, sound, label } = data;
           console.log('[Notification] Navigating to alarm screen');
           isOnAlarmScreenRef.current = true;
-          router.push({ pathname: '/alarm/active', params: { alarmId } });
+          router.push({
+            pathname: '/alarm/active',
+            params: { alarmId, penaltyAmount, sound, label }
+          });
         } else {
           console.log('[Notification] Already on alarm screen, skipping navigation');
         }
@@ -156,8 +167,13 @@ function RootLayoutNav() {
         if (alarmId && typeof alarmId === 'string') {
           // Small delay to ensure navigation is ready
           setTimeout(() => {
+            const data = response.notification.request.content.data as any;
+            const { penaltyAmount, sound, label } = data;
             isOnAlarmScreenRef.current = true;
-            router.push({ pathname: '/alarm/active', params: { alarmId } });
+            router.push({
+              pathname: '/alarm/active',
+              params: { alarmId, penaltyAmount, sound, label }
+            });
           }, 500);
         }
       }
@@ -181,13 +197,13 @@ function RootLayoutNav() {
     if (!hasSeenOnboarding && !inOnboarding) {
       router.replace('/onboarding');
     } else if (hasSeenOnboarding && inOnboarding) {
-      router.replace(user ? '/(tabs)' : '/(auth)/login');
-    } else if (hasSeenOnboarding && user && !inTabsGroup && !inAlarmGroup) {
+      router.replace((user || isGuest) ? '/(tabs)' : '/(auth)/login');
+    } else if (hasSeenOnboarding && (user || isGuest) && !inTabsGroup && !inAlarmGroup) {
       router.replace('/(tabs)');
-    } else if (hasSeenOnboarding && !user && !inAuthGroup) {
+    } else if (hasSeenOnboarding && !user && !isGuest && !inAuthGroup) {
       router.replace('/(auth)/login');
     }
-  }, [user, loading, segments, hasSeenOnboarding]);
+  }, [user, isGuest, loading, segments, hasSeenOnboarding]);
 
   if (loading) {
     return (

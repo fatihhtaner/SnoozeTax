@@ -16,13 +16,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function StatsScreen() {
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
-    const { user } = useAuth();
+    const { user, isGuest } = useAuth();
     const { t } = useLanguage();
     const [profile, setProfile] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
     const loadStats = async () => {
-        if (!user) return;
+        if (isGuest) {
+            setLoading(false);
+            return;
+        }
+        if (!user) return; // Should not happen if protected properly, but safety check
+
         try {
             // Only set loading if we don't have data yet to prevent layout jump
             if (!profile) setLoading(true);
@@ -63,47 +68,56 @@ export default function StatsScreen() {
                     contentContainerStyle={styles.scrollContent}
                     contentInsetAdjustmentBehavior="never"
                     showsVerticalScrollIndicator={false}
-                    refreshControl={<RefreshControl refreshing={loading && !profile} onRefresh={() => { setLoading(true); loadStats(); }} tintColor="#CBF3F0" />}
+                    refreshControl={!isGuest ? <RefreshControl refreshing={loading && !profile} onRefresh={() => { setLoading(true); loadStats(); }} tintColor="#CBF3F0" /> : undefined}
                 >
                     <View style={styles.header}>
                         <Text style={styles.title}>{t('dashboard_title')}</Text>
                         <Text style={styles.subtitle}>{t('dashboard_subtitle')}</Text>
                     </View>
 
-                    {/* Main Card */}
-                    <GlassCard style={styles.mainCard}>
-                        <LinearGradient
-                            colors={['rgba(255, 107, 107, 0.2)', 'rgba(255, 82, 82, 0.1)']}
-                            style={StyleSheet.absoluteFillObject}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                        />
-                        <Text style={styles.cardLabel}>{t('total_lost')}</Text>
-                        <Text style={styles.cardValue}>${Number(totalLost).toFixed(2)}</Text>
-                        <Text style={styles.cardSub}>{t('money_slept_away')}</Text>
-                    </GlassCard>
-
-                    {/* Grid Stats */}
-                    <View style={styles.grid}>
-                        <GlassCard style={styles.statBox}>
-                            <FontAwesome name="bell-o" size={24} color="#CBF3F0" style={{ marginBottom: 8 }} />
-                            <Text style={styles.statValue}>{totalSnoozes}</Text>
-                            <Text style={styles.statLabel}>{t('snoozes')}</Text>
+                    {isGuest ? (
+                        <GlassCard style={styles.guestStatsCard}>
+                            <FontAwesome name="lock" size={40} color="rgba(255,255,255,0.6)" style={{ marginBottom: 15 }} />
+                            <Text style={styles.guestStatsText}>{t('guest_stats_message') || 'Sign in to track your progress and stats'}</Text>
                         </GlassCard>
+                    ) : (
+                        <>
+                            {/* Main Card */}
+                            <GlassCard style={styles.mainCard}>
+                                <LinearGradient
+                                    colors={['rgba(255, 107, 107, 0.2)', 'rgba(255, 82, 82, 0.1)']}
+                                    style={StyleSheet.absoluteFillObject}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                />
+                                <Text style={styles.cardLabel}>{t('total_lost')}</Text>
+                                <Text style={styles.cardValue}>${Number(totalLost).toFixed(2)}</Text>
+                                <Text style={styles.cardSub}>{t('money_slept_away')}</Text>
+                            </GlassCard>
 
-                        <GlassCard style={styles.statBox}>
-                            <FontAwesome name="trophy" size={24} color="#FFD166" style={{ marginBottom: 8 }} />
-                            <Text style={styles.statValue}>{score}</Text>
-                            <Text style={styles.statLabel}>{t('score')}</Text>
-                        </GlassCard>
-                    </View>
+                            {/* Grid Stats */}
+                            <View style={styles.grid}>
+                                <GlassCard style={styles.statBox}>
+                                    <FontAwesome name="bell-o" size={24} color="#CBF3F0" style={{ marginBottom: 8 }} />
+                                    <Text style={styles.statValue}>{totalSnoozes}</Text>
+                                    <Text style={styles.statLabel}>{t('snoozes')}</Text>
+                                </GlassCard>
 
-                    <GlassCard style={styles.motivationBox}>
-                        <Text style={styles.motivationTitle}>{t('motivation_title')}</Text>
-                        <Text style={styles.motivationText}>
-                            {t('motivation_text')}
-                        </Text>
-                    </GlassCard>
+                                <GlassCard style={styles.statBox}>
+                                    <FontAwesome name="trophy" size={24} color="#FFD166" style={{ marginBottom: 8 }} />
+                                    <Text style={styles.statValue}>{score}</Text>
+                                    <Text style={styles.statLabel}>{t('score')}</Text>
+                                </GlassCard>
+                            </View>
+
+                            <GlassCard style={styles.motivationBox}>
+                                <Text style={styles.motivationTitle}>{t('motivation_title')}</Text>
+                                <Text style={styles.motivationText}>
+                                    {t('motivation_text')}
+                                </Text>
+                            </GlassCard>
+                        </>
+                    )}
 
                 </ScrollView>
             </SafeAreaView>
@@ -200,4 +214,18 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         textAlign: 'center',
     },
+    guestStatsCard: {
+        padding: 40,
+        marginTop: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderStyle: 'dashed',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+    },
+    guestStatsText: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 16,
+        textAlign: 'center',
+    }
 });

@@ -8,13 +8,12 @@ import { useLanguage } from '@/context/LanguageContext';
 import { UserService } from '@/services/UserService';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { signOut } from 'firebase/auth';
 import React, { useState } from 'react';
 import { Alert, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ProfileScreen() {
-    const { userProfile } = useAuth();
+    const { userProfile, isGuest, logout } = useAuth();
     const { t, setLocale, locale } = useLanguage();
     const router = useRouter();
 
@@ -23,7 +22,7 @@ export default function ProfileScreen() {
 
     const handleSignOut = async () => {
         try {
-            await signOut(auth);
+            await logout();
             router.replace('/(auth)/login');
         } catch (error) {
             Alert.alert(t('error'), t('failed_sign_out'));
@@ -86,24 +85,32 @@ export default function ProfileScreen() {
                             {userProfile?.photoURL ? (
                                 <Image source={{ uri: userProfile.photoURL }} style={styles.avatarImage} />
                             ) : (
-                                <FontAwesome name="user" size={50} color="#CBF3F0" />
+                                <FontAwesome name={isGuest ? "user-secret" : "user"} size={50} color="#CBF3F0" />
                             )}
                         </View>
-                        <Text style={styles.name}>{userProfile?.displayName || 'User'}</Text>
-                        <Text style={styles.email}>{userProfile?.email}</Text>
+                        <Text style={styles.name}>{isGuest ? t('guest_user') : (userProfile?.displayName || 'User')}</Text>
+                        <Text style={styles.email}>{isGuest ? t('not_signed_in') : userProfile?.email}</Text>
                     </View>
 
+                    {/* Stats Summary Row (Hide for Guests) */}
                     {/* Stats Summary Row */}
-                    <View style={styles.statsRow}>
-                        <GlassCard style={styles.statItem}>
-                            <Text style={styles.statValue}>{userProfile?.stats?.totalSnoozes || 0}</Text>
-                            <Text style={styles.statLabel}>{t('snoozes')}</Text>
+                    {!isGuest ? (
+                        <View style={styles.statsRow}>
+                            <GlassCard style={styles.statItem}>
+                                <Text style={styles.statValue}>{userProfile?.stats?.totalSnoozes || 0}</Text>
+                                <Text style={styles.statLabel}>{t('snoozes')}</Text>
+                            </GlassCard>
+                            <GlassCard style={styles.statItem}>
+                                <Text style={[styles.statValue, { color: '#FF6B6B' }]}>${Number(userProfile?.stats?.totalMoneyLost || 0).toFixed(2)}</Text>
+                                <Text style={styles.statLabel}>{t('lost')}</Text>
+                            </GlassCard>
+                        </View>
+                    ) : (
+                        <GlassCard style={styles.guestStatsCard}>
+                            <FontAwesome name="lock" size={24} color="rgba(255,255,255,0.6)" style={{ marginBottom: 8 }} />
+                            <Text style={styles.guestStatsText}>{t('guest_stats_message') || 'Sign in to track your progress and stats'}</Text>
                         </GlassCard>
-                        <GlassCard style={styles.statItem}>
-                            <Text style={[styles.statValue, { color: '#FF6B6B' }]}>${Number(userProfile?.stats?.totalMoneyLost || 0).toFixed(2)}</Text>
-                            <Text style={styles.statLabel}>{t('lost')}</Text>
-                        </GlassCard>
-                    </View>
+                    )}
 
                     {/* Settings Section */}
                     <View style={styles.section}>
@@ -173,21 +180,23 @@ export default function ProfileScreen() {
                         </GlassCard>
                     </View>
 
-                    {/* Sign Out */}
+                    {/* Sign Out / Sign Up */}
                     <TouchableOpacity
-                        style={styles.signOutButton}
+                        style={[styles.signOutButton, isGuest && { borderColor: '#2EC4B6', backgroundColor: 'rgba(46, 196, 182, 0.2)' }]}
                         onPress={handleSignOut}>
-                        <FontAwesome name="sign-out" size={16} color="#FF6B6B" style={{ marginRight: 8 }} />
-                        <Text style={styles.signOutText}>{t('sign_out')}</Text>
+                        <FontAwesome name={isGuest ? "sign-in" : "sign-out"} size={16} color={isGuest ? "#2EC4B6" : "#FF6B6B"} style={{ marginRight: 8 }} />
+                        <Text style={[styles.signOutText, isGuest && { color: '#2EC4B6' }]}>{isGuest ? t('sign_up') : t('sign_out')}</Text>
                     </TouchableOpacity>
 
-                    {/* Delete Account */}
-                    <TouchableOpacity
-                        style={styles.deleteAccountButton}
-                        onPress={handleDeleteAccount}>
-                        <FontAwesome name="trash-o" size={16} color="rgba(255, 107, 107, 0.7)" style={{ marginRight: 8 }} />
-                        <Text style={styles.deleteAccountText}>{t('delete_account')}</Text>
-                    </TouchableOpacity>
+                    {/* Delete Account (Hide for Guest) */}
+                    {!isGuest && (
+                        <TouchableOpacity
+                            style={styles.deleteAccountButton}
+                            onPress={handleDeleteAccount}>
+                            <FontAwesome name="trash-o" size={16} color="rgba(255, 107, 107, 0.7)" style={{ marginRight: 8 }} />
+                            <Text style={styles.deleteAccountText}>{t('delete_account')}</Text>
+                        </TouchableOpacity>
+                    )}
 
                     <Text style={styles.versionText}>{t('version')} 1.0.0</Text>
 
@@ -207,8 +216,8 @@ export default function ProfileScreen() {
                             style={[
                                 styles.langOption,
                                 {
-                                    backgroundColor: locale === lang.code ? 'rgba(203, 243, 240, 0.2)' : 'transparent',
-                                    borderColor: locale === lang.code ? '#CBF3F0' : 'transparent'
+                                    backgroundColor: locale === lang.code ? 'rgba(203, 243, 240, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                    borderColor: locale === lang.code ? '#CBF3F0' : 'rgba(255, 255, 255, 0.1)'
                                 }
                             ]}
                             onPress={() => {
@@ -269,7 +278,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { padding: 20 },
+    scrollContent: { padding: 20, paddingBottom: 100 },
     header: { alignItems: 'center', marginBottom: 30 },
     avatarContainer: {
         width: 100, height: 100, borderRadius: 50, borderWidth: 2,
@@ -343,17 +352,21 @@ const styles = StyleSheet.create({
         color: '#FF6B6B',
     },
     deleteAccountButton: {
-        marginTop: 20,
+        marginTop: 15,
         alignItems: 'center',
         padding: 15,
-        marginBottom: 20,
+        marginBottom: 10,
         flexDirection: 'row',
         justifyContent: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     deleteAccountText: {
         fontSize: 14,
         color: 'rgba(255, 107, 107, 0.7)',
-        textDecorationLine: 'underline',
+        fontWeight: '600',
     },
     langOption: {
         flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: 'transparent'
@@ -363,6 +376,21 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: 'rgba(255,255,255,0.3)',
         marginBottom: 20,
+        marginTop: 40,
         fontSize: 12,
+    },
+    guestStatsCard: {
+        padding: 20,
+        marginBottom: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderStyle: 'dashed',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+    },
+    guestStatsText: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 14,
+        textAlign: 'center',
     }
 });

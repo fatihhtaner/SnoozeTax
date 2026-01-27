@@ -57,6 +57,7 @@ export const SoundService = {
 
             // Remove existing player properly
             if (player) {
+                player.pause();
                 player.remove();
                 player = null;
             }

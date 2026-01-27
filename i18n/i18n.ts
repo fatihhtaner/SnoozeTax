@@ -131,7 +131,12 @@ Website: https://ibrahimfatihtaner.com/#contact
         transaction_failed: 'Transaction failed.',
         // Auth screens
         sign_in: 'Sign In',
+        guest_user: 'Guest User',
+        continue_as_guest: 'Continue as Guest',
+        not_signed_in: 'Not signed in',
+
         sign_up: 'Sign Up',
+        guest_stats_message: 'Sign in to track your snoozes, score, and money lost.',
         password: 'Password',
         full_name: 'Full Name',
         confirm_password: 'Confirm Password',
@@ -348,7 +353,12 @@ Web Sitesi: https://ibrahimfatihtaner.com/#contact
         transaction_failed: 'İşlem başarısız.',
         // Auth screens
         sign_in: 'Giriş Yap',
+        guest_user: 'Misafir Kullanıcı',
+        continue_as_guest: 'Misafir Olarak Devam Et',
+        not_signed_in: 'Giriş yapılmadı',
+
         sign_up: 'Kayıt Ol',
+        guest_stats_message: 'Ertelemelerinizi, puanınızı ve kaybettiğiniz parayı takip etmek için giriş yapın.',
         password: 'Şifre',
         full_name: 'Ad Soyad',
         confirm_password: 'Şifreyi Onayla',
@@ -563,7 +573,12 @@ Webseite: https://ibrahimfatihtaner.com/#contact
         transaction_failed: 'Transaktion fehlgeschlagen.',
         // Auth screens
         sign_in: 'Anmelden',
+        guest_user: 'Gastbenutzer',
+        continue_as_guest: 'Als Gast fortfahren',
+        not_signed_in: 'Nicht angemeldet',
+
         sign_up: 'Registrieren',
+        guest_stats_message: 'Melde dich an, um deine Schlummer, Punktzahl und Verluste zu verfolgen.',
         password: 'Passwort',
         full_name: 'Vollständiger Name',
         confirm_password: 'Passwort bestätigen',
@@ -778,7 +793,12 @@ Site Web : https://ibrahimfatihtaner.com/#contact
         transaction_failed: 'Échec de la transaction.',
         // Auth screens
         sign_in: 'Se connecter',
+        guest_user: 'Utilisateur invité',
+        continue_as_guest: 'Continuer en tant qu\'invité',
+        not_signed_in: 'Non connecté',
+
         sign_up: "S'inscrire",
+        guest_stats_message: 'Connectez-vous pour suivre vos répétitions, votre score et vos pertes.',
         password: 'Mot de passe',
         full_name: 'Nom complet',
         confirm_password: 'Confirmer le mot de passe',

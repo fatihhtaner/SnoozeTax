@@ -77,7 +77,6 @@ const styles = StyleSheet.create({
         padding: 5,
     },
     content: {
-        flex: 1,
         padding: 20,
     },
 });

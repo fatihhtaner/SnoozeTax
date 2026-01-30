@@ -2,6 +2,7 @@ import GlassCard from '@/components/GlassCard';
 import GradientBackground from '@/components/GradientBackground';
 import { useLanguage } from '@/context/LanguageContext';
 import { useOnboarding } from '@/context/OnboardingContext';
+import { NotificationService } from '@/services/NotificationService';
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -36,6 +37,12 @@ export default function OnboardingScreen() {
             description: t('onboarding_desc_3'),
             icon: 'sun-o',
         },
+        {
+            id: '4',
+            title: t('onboarding_title_4'),
+            description: t('onboarding_desc_4'),
+            icon: 'bell-o',
+        },
     ];
 
     const handleNext = async () => {
@@ -47,6 +54,9 @@ export default function OnboardingScreen() {
         } else {
             // Finish
             try {
+                // Request Notification Permissions
+                await NotificationService.requestPermissions();
+
                 await completeOnboarding();
                 // No need to manually route, _layout will react to state change
             } catch (error) {

@@ -79,10 +79,20 @@ export const SoundService = {
      * Stops the currently playing sound.
      */
     async stopSound() {
+        console.log('[SoundService] Stopping sound...');
         if (player) {
-            player.pause();
-            player.remove();
-            player = null;
+            try {
+                player.pause();
+                player.remove();
+                player = null;
+                console.log('[SoundService] Sound stopped successfully.');
+            } catch (error) {
+                console.error('[SoundService] Error stopping sound:', error);
+                // Force nullify even on error to prevent zombie references
+                player = null;
+            }
+        } else {
+            console.log('[SoundService] No sound playing to stop.');
         }
     }
 };

@@ -1,5 +1,6 @@
 import GradientBackground from '@/components/GradientBackground';
 import { useAuth } from '@/context/AuthContext';
+import { useGlobalModal } from '@/context/GlobalModalContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { AlarmService } from '@/services/AlarmService';
 import { NotificationService } from '@/services/NotificationService';
@@ -12,7 +13,7 @@ import * as InAppPurchases from 'expo-in-app-purchases';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -40,15 +41,13 @@ export default function ActiveAlarmScreen() {
     const router = useRouter();
     const { user } = useAuth();
     const { t, locale } = useLanguage();
+    const { showSuccessModal } = useGlobalModal();
 
     const [alarm, setAlarm] = useState<Alarm | null>(null);
     const [currentTime, setCurrentTime] = useState(new Date());
 
     // IAP State
     const [isProcessing, setIsProcessing] = useState(false);
-
-    // Success Modal State
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -61,6 +60,7 @@ export default function ActiveAlarmScreen() {
         }
     }, [alarmId, user, penaltyAmount, sound, label]);
 
+    // Play sound when alarm is loaded
     // Play sound when alarm is loaded
     useEffect(() => {
         if (alarm?.sound) {
@@ -246,36 +246,60 @@ export default function ActiveAlarmScreen() {
     };
 
     const handleWakeUp = async () => {
-        // Stop sound immediately
-        await SoundService.stopSound();
+        try {
+            const targetId = alarmId || alarm?.id;
+            console.log(`[ActiveAlarm] User clicked I'm Up. targetId: ${targetId}`);
 
-        if (alarm?.id === 'test') {
-            // Skip DB updates for test alarm
-            await NotificationService.cancelAlarm('test');
-            setShowSuccessModal(true);
-            setTimeout(async () => {
-                setShowSuccessModal(false);
+            // 1. Stop sound and notifications IMMEDIATELY
+            await SoundService.stopSound();
+
+            if (targetId) {
+                // Suppress triggering new navigation from these cancellations
+                NotificationService.suppressAlarm(targetId);
+                await NotificationService.cancelAlarm(targetId);
+            } else {
+                console.warn('[ActiveAlarm] No ID found to suppress!');
+            }
+
+            // 2. Handle Test Alarm
+            if (targetId === 'test') {
+                showSuccessModal();
                 router.replace('/(tabs)');
-            }, 2500);
-            return;
-        }
+                return;
+            }
 
-        if (alarm?.id && alarm.repeat.length === 0) {
-            await AlarmService.updateAlarm(alarm.id, { isActive: false });
-        }
+            // 3. Update DB (Backend)
+            // We do this concurrently but don't let it block the UI reaction too much if possible
+            // But we do want to wait for it to ensure data consistency
+            console.log(`[ActiveAlarm] Checking repeat for deactivation. targetId: ${targetId}, repeat: ${JSON.stringify(alarm?.repeat)}`);
+            if (targetId && (!alarm?.repeat || alarm.repeat.length === 0)) {
+                console.log(`[ActiveAlarm] Deactivating non-repeating alarm: ${targetId}`);
+                await AlarmService.updateAlarm(targetId, { isActive: false });
+            }
 
-        if (user) {
-            await UserService.updateUserStats(user.uid, 0, false, true);
-        }
+            if (user) {
+                await UserService.updateUserStats(user.uid, 0, false, true);
+            }
 
-        if (alarm?.id) await NotificationService.cancelAlarm(alarm.id);
-
-        setShowSuccessModal(true);
-
-        setTimeout(async () => {
-            setShowSuccessModal(false);
+            // 4. Show Success and Exit
+            showSuccessModal();
             router.replace('/(tabs)');
-        }, 2500);
+
+        } catch (error) {
+            console.error('[ActiveAlarm] Error in handleWakeUp:', error);
+            // Even if DB fails, we must stop technical alarm artifacts
+            await SoundService.stopSound();
+            const targetId = alarmId || alarm?.id;
+            if (targetId) {
+                NotificationService.suppressAlarm(targetId);
+                await NotificationService.cancelAlarm(targetId);
+            }
+
+            // Still let them out, or show error? 
+            // Better to let them out to stop the annoyance.
+            Alert.alert('Error', 'Could not update stats, but alarm is stopped.');
+            router.replace('/(tabs)');
+        }
     };
 
     const penalty = alarm?.penaltyAmount || 0;
@@ -371,34 +395,7 @@ export default function ActiveAlarmScreen() {
                 </View>
 
                 {/* Success Modal */}
-                <Modal
-                    animationType="fade"
-                    transparent={true}
-                    visible={showSuccessModal}
-                    onRequestClose={() => setShowSuccessModal(false)}
-                >
-                    <View style={styles.successModalOverlay}>
-                        <View style={styles.successModalContent}>
-                            <LinearGradient
-                                colors={['#CBF3F0', '#2EC4B6']}
-                                style={styles.successIconContainer}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                            >
-                                <FontAwesome name="sun-o" size={60} color="#FFF" />
-                            </LinearGradient>
 
-                            <Text style={styles.successModalTitle}>{t('welcome')}</Text>
-                            <Text style={styles.successModalMessage}>{t('wake_up_success_msg')}</Text>
-
-                            <View style={styles.celebrationContainer}>
-                                <Text style={styles.celebrationEmoji}>🎉</Text>
-                                <Text style={styles.celebrationEmoji}>☀️</Text>
-                                <Text style={styles.celebrationEmoji}>💪</Text>
-                            </View>
-                        </View>
-                    </View>
-                </Modal>
 
             </SafeAreaView>
         </GradientBackground>
@@ -544,49 +541,5 @@ const styles = StyleSheet.create({
         fontSize: 11,
         textAlign: 'center',
     },
-    // Success Modal Styles
-    successModalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.95)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    successModalContent: {
-        alignItems: 'center',
-        width: '100%',
-        padding: 40,
-    },
-    successIconContainer: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 30,
-        shadowColor: '#2EC4B6',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 30,
-    },
-    successModalTitle: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: '#FFFFFF',
-        marginBottom: 10,
-        textAlign: 'center',
-    },
-    successModalMessage: {
-        fontSize: 18,
-        color: 'rgba(255, 255, 255, 0.7)',
-        textAlign: 'center',
-        marginBottom: 40,
-        lineHeight: 28,
-    },
-    celebrationContainer: {
-        flexDirection: 'row',
-        gap: 20,
-    },
-    celebrationEmoji: {
-        fontSize: 40,
-    },
+
 });

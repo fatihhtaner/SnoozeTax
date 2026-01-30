@@ -123,6 +123,12 @@ function RootLayoutNav() {
 
       // Handle simple tap OR explicit action buttons
       if (alarmId && typeof alarmId === 'string') {
+        // CHECK SUPPRESSION
+        if (NotificationService.isSuppressed(alarmId)) {
+          console.log(`[Notification] Ignoring suppression for alarm ${alarmId}`);
+          return;
+        }
+
         // If they tapped "Snooze" or "I'm Up", we can pass that intent
         // For now, we just route to active alarm, and they can tap the big button there.
         // This is safer for ensuring they actually engage with the UI (and pay if needed).
@@ -144,6 +150,12 @@ function RootLayoutNav() {
       const alarmId = notification.request.content.data.alarmId;
       // Only navigate if user is NOT already on the alarm screen
       if (alarmId && typeof alarmId === 'string') {
+        // CHECK SUPPRESSION
+        if (NotificationService.isSuppressed(alarmId)) {
+          console.log(`[Notification] Ignoring suppression for alarm ${alarmId}`);
+          return;
+        }
+
         // Don't navigate if already on alarm/active screen
         if (!isOnAlarmScreenRef.current) {
           const data = notification.request.content.data as any;
@@ -229,13 +241,19 @@ function RootLayoutNav() {
   );
 }
 
+import GlobalSuccessModal from '@/components/GlobalSuccessModal';
+import { GlobalModalProvider } from '@/context/GlobalModalContext';
+
 export default function RootLayout() {
   return (
     <LanguageProvider>
       <AuthProvider>
         <OnboardingProvider>
           <ToastProvider>
-            <RootLayoutNav />
+            <GlobalModalProvider>
+              <RootLayoutNav />
+              <GlobalSuccessModal />
+            </GlobalModalProvider>
           </ToastProvider>
         </OnboardingProvider>
       </AuthProvider>

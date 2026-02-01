@@ -180,7 +180,7 @@ export default function AlarmsScreen() {
           onPress={() => router.push('/alarm/editor')}
           activeOpacity={0.8}>
           <LinearGradient
-            colors={['#2EC4B6', '#CBF3F0']}
+            colors={['#FFD700', '#FDB931']}
             style={styles.fabGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}>
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     right: 24,
     bottom: 24,
     borderRadius: 30,
-    shadowColor: '#2EC4B6',
+    shadowColor: '#FFD700',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,

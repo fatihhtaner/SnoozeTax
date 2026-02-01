@@ -4,6 +4,7 @@ import { SOUNDS } from '@/constants/Sounds';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { AlarmService } from '@/services/AlarmService';
+import { CustomSound, CustomSoundService } from '@/services/CustomSoundService';
 import { NotificationService } from '@/services/NotificationService';
 import { SoundService } from '@/services/SoundService';
 import { FontAwesome } from '@expo/vector-icons';
@@ -42,16 +43,52 @@ export default function AlarmEditorScreen() {
     const [fetching, setFetching] = useState(!!id);
     const [playingSound, setPlayingSound] = useState<string | null>(null);
     const [soundModalVisible, setSoundModalVisible] = useState(false);
+    const [customSounds, setCustomSounds] = useState<CustomSound[]>([]);
 
     useEffect(() => {
         // Request permissions on mount
         NotificationService.requestPermissions();
+        loadCustomSounds();
 
         return () => {
             // Cleanup sound on unmount
             SoundService.stopSound();
         };
     }, []);
+
+    const loadCustomSounds = async () => {
+        const sounds = await CustomSoundService.getCustomSounds();
+        setCustomSounds(sounds);
+    };
+
+    const handleAddCustomSound = async () => {
+        const newSound = await CustomSoundService.pickAndSaveSound();
+        if (newSound) {
+            setCustomSounds(prev => [...prev, newSound]);
+            setSound(newSound.uri); // Select the new sound
+        }
+    };
+
+    const handleDeleteCustomSound = async (id: string) => {
+        Alert.alert(
+            t('delete_sound'),
+            t('delete_sound_confirm'),
+            [
+                { text: t('cancel'), style: 'cancel' },
+                {
+                    text: t('delete'),
+                    style: 'destructive',
+                    onPress: async () => {
+                        await CustomSoundService.deleteSound(id);
+                        setCustomSounds(prev => prev.filter(s => s.id !== id));
+                        if (sound === customSounds.find(s => s.id === id)?.uri) {
+                            setSound('Classic'); // Reset if deleted sound was selected
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     const handlePlaySound = async (soundKey: string) => {
         if (playingSound === soundKey) {
@@ -279,7 +316,15 @@ export default function AlarmEditorScreen() {
                             onPress={() => setSoundModalVisible(true)}
                         >
                             <Text style={styles.soundSelectorText}>
-                                {SOUNDS.find(s => s.key === sound)?.labelKey ? t(SOUNDS.find(s => s.key === sound)!.labelKey) : sound}
+                                {(() => {
+                                    const standardSound = SOUNDS.find(s => s.key === sound);
+                                    if (standardSound) return t(standardSound.labelKey);
+
+                                    const customSound = customSounds.find(s => s.uri === sound);
+                                    if (customSound) return customSound.name;
+
+                                    return sound;
+                                })()}
                             </Text>
                             <FontAwesome name="chevron-right" size={16} color="rgba(255,255,255,0.6)" />
                         </TouchableOpacity>
@@ -302,7 +347,7 @@ export default function AlarmEditorScreen() {
                         onPress={handleSave}
                         disabled={loading}>
                         <LinearGradient
-                            colors={['#2EC4B6', '#CBF3F0']}
+                            colors={['#FFD700', '#FDB931']}
                             style={styles.gradientButton}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}>
@@ -340,36 +385,52 @@ export default function AlarmEditorScreen() {
                         </View>
 
                         <FlatList
-                            data={SOUNDS}
-                            keyExtractor={(item) => item.key}
-                            renderItem={({ item }) => (
+                            data={[...customSounds.map(s => ({ ...s, isCustom: true })), ...SOUNDS]}
+                            keyExtractor={(item: any) => item.isCustom ? item.id : item.key}
+                            ListHeaderComponent={
+                                <TouchableOpacity style={styles.addSoundButton} onPress={handleAddCustomSound}>
+                                    <FontAwesome name="plus" size={16} color="#0F2027" />
+                                    <Text style={styles.addSoundButtonText}>{t('add_custom_sound') || "Add Custom Sound"}</Text>
+                                </TouchableOpacity>
+                            }
+                            renderItem={({ item }: { item: any }) => (
                                 <View style={styles.modalItem}>
                                     <TouchableOpacity
                                         style={styles.modalItemSelect}
                                         onPress={() => {
-                                            setSound(item.key);
+                                            setSound(item.isCustom ? item.uri : item.key);
                                             setSoundModalVisible(false);
                                         }}
                                     >
                                         <Text style={[
                                             styles.modalItemText,
-                                            sound === item.key && styles.modalItemTextActive
+                                            sound === (item.isCustom ? item.uri : item.key) && styles.modalItemTextActive
                                         ]}>
-                                            {t(item.labelKey)}
+                                            {item.isCustom ? item.name : t(item.labelKey)}
                                         </Text>
-                                        {sound === item.key && <FontAwesome name="check" size={16} color="#CBF3F0" />}
+                                        {sound === (item.isCustom ? item.uri : item.key) && <FontAwesome name="check" size={16} color="#CBF3F0" />}
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity
-                                        style={styles.modalPlayButton}
-                                        onPress={() => handlePlaySound(item.key)}
-                                    >
-                                        <FontAwesome
-                                            name={playingSound === item.key ? "stop" : "play"}
-                                            size={16}
-                                            color={playingSound === item.key ? "#FF6B6B" : "#CBF3F0"}
-                                        />
-                                    </TouchableOpacity>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                        {item.isCustom && (
+                                            <TouchableOpacity
+                                                style={styles.deleteSoundButton}
+                                                onPress={() => handleDeleteCustomSound(item.id)}
+                                            >
+                                                <FontAwesome name="trash" size={16} color="#FF6B6B" />
+                                            </TouchableOpacity>
+                                        )}
+                                        <TouchableOpacity
+                                            style={styles.modalPlayButton}
+                                            onPress={() => handlePlaySound(item.isCustom ? item.uri : item.key)}
+                                        >
+                                            <FontAwesome
+                                                name={playingSound === (item.isCustom ? item.uri : item.key) ? "stop" : "play"}
+                                                size={16}
+                                                color={playingSound === (item.isCustom ? item.uri : item.key) ? "#FF6B6B" : "#CBF3F0"}
+                                            />
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             )}
                             contentContainerStyle={{ paddingBottom: 20 }}
@@ -458,7 +519,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginTop: 20,
         marginBottom: 10,
-        shadowColor: '#2EC4B6',
+        shadowColor: '#FFD700',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -622,4 +683,22 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.05)',
         borderRadius: 20,
     },
+    addSoundButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#CBF3F0',
+        padding: 15,
+        borderRadius: 12,
+        marginBottom: 10,
+        gap: 10,
+    },
+    addSoundButtonText: {
+        color: '#0F2027',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    deleteSoundButton: {
+        padding: 10,
+    }
 });

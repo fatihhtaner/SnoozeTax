@@ -5,18 +5,19 @@ import StarBackground from './StarBackground';
 
 interface GradientBackgroundProps {
     children: ReactNode;
+    hasStars?: boolean;
 }
 
-export default function GradientBackground({ children }: GradientBackgroundProps) {
+export default function GradientBackground({ children, hasStars = true }: GradientBackgroundProps) {
     return (
         <ImageBackground
             source={require('@/assets/images/login-bg.png')}
             style={styles.backgroundImage}
             resizeMode="cover">
-            <StarBackground />
             <LinearGradient
-                colors={['rgba(15, 32, 39, 0.8)', 'rgba(44, 83, 100, 0.9)', 'rgba(32, 58, 67, 0.85)']}
+                colors={['#162046', '#0F1428', '#0A0E1E']}
                 style={styles.gradient}>
+                {hasStars && <StarBackground />}
                 {children}
             </LinearGradient>
         </ImageBackground>

@@ -49,7 +49,13 @@ export const SoundService = {
      */
     async playSound(name: string) {
         try {
-            const source = soundMap[name];
+            let source;
+            if (name.startsWith('file://')) {
+                source = { uri: name };
+            } else {
+                source = soundMap[name];
+            }
+
             if (!source) {
                 console.warn(`Sound file for ${name} not found.`);
                 return;

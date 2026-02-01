@@ -22,12 +22,12 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#CBF3F0',
+        tabBarActiveTintColor: '#FFD700', // Gold
         tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.5)',
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: 'rgba(15, 32, 39, 0.95)',
-          borderTopColor: 'rgba(255, 255, 255, 0.2)',
+          backgroundColor: 'rgba(22, 32, 70, 0.95)', // Deep Blue
+          borderTopColor: 'rgba(255, 215, 0, 0.2)', // Gold border
           borderTopWidth: 1,
           height: 85,
           paddingBottom: 8,

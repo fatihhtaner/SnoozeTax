@@ -32,6 +32,12 @@ export default function OnboardingScreen() {
             icon: 'sliders',
         },
         {
+            id: 'custom_sound',
+            title: t('onboarding_title_custom_sound'),
+            description: t('onboarding_desc_custom_sound'),
+            icon: 'music', // FontAwesome name
+        },
+        {
             id: '3',
             title: t('onboarding_title_3'),
             description: t('onboarding_desc_3'),
@@ -91,10 +97,10 @@ export default function OnboardingScreen() {
                         <GlassCard style={styles.card}>
                             <View style={styles.iconContainer}>
                                 <LinearGradient
-                                    colors={['rgba(46, 196, 182, 0.2)', 'rgba(203, 243, 240, 0.1)']}
+                                    colors={['rgba(255, 215, 0, 0.2)', 'rgba(255, 215, 0, 0.1)']} // Gold tint
                                     style={styles.iconBackground}
                                 >
-                                    <FontAwesome name={item.icon as any} size={80} color="#CBF3F0" />
+                                    <FontAwesome name={item.icon as any} size={80} color="#FFD700" />
                                 </LinearGradient>
                             </View>
                             <Text style={styles.title}>{item.title}</Text>
@@ -113,7 +119,7 @@ export default function OnboardingScreen() {
                             style={[
                                 styles.dot,
                                 {
-                                    backgroundColor: i === activeIndex ? '#CBF3F0' : 'rgba(255, 255, 255, 0.3)',
+                                    backgroundColor: i === activeIndex ? '#FFD700' : 'rgba(255, 255, 255, 0.3)',
                                     width: i === activeIndex ? 20 : 8,
                                 },
                             ]}
@@ -126,7 +132,7 @@ export default function OnboardingScreen() {
                     onPress={handleNext}
                 >
                     <LinearGradient
-                        colors={['#2EC4B6', '#CBF3F0']}
+                        colors={['#FFD700', '#FDB931']} // Gold Gradient
                         style={styles.gradientButton}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
@@ -135,7 +141,7 @@ export default function OnboardingScreen() {
                             {activeIndex === SLIDES.length - 1 ? t('onboarding_start') : t('next')}
                         </Text>
                         {activeIndex !== SLIDES.length - 1 && (
-                            <FontAwesome name="arrow-right" size={16} color="#0F2027" style={{ marginLeft: 10 }} />
+                            <FontAwesome name="arrow-right" size={16} color="#162046" style={{ marginLeft: 10 }} />
                         )}
                     </LinearGradient>
                 </TouchableOpacity>
@@ -162,7 +168,7 @@ const styles = StyleSheet.create({
     },
     iconContainer: {
         marginBottom: 40,
-        shadowColor: '#2EC4B6',
+        shadowColor: '#FFD700',
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.3,
         shadowRadius: 20,
@@ -210,7 +216,7 @@ const styles = StyleSheet.create({
         width: '100%',
         height: 56,
         borderRadius: 28,
-        shadowColor: '#2EC4B6',
+        shadowColor: '#FFD700',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -225,7 +231,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     buttonText: {
-        color: '#0F2027',
+        color: '#162046', // Deep Blue Text
         fontSize: 18,
         fontWeight: 'bold',
     },

@@ -182,10 +182,10 @@ export default function ProfileScreen() {
 
                     {/* Sign Out / Sign Up */}
                     <TouchableOpacity
-                        style={[styles.signOutButton, isGuest && { borderColor: '#2EC4B6', backgroundColor: 'rgba(46, 196, 182, 0.2)' }]}
+                        style={[styles.signOutButton, isGuest && { borderColor: '#FFD700', backgroundColor: 'rgba(255, 215, 0, 0.1)' }]}
                         onPress={handleSignOut}>
-                        <FontAwesome name={isGuest ? "sign-in" : "sign-out"} size={16} color={isGuest ? "#2EC4B6" : "#FF6B6B"} style={{ marginRight: 8 }} />
-                        <Text style={[styles.signOutText, isGuest && { color: '#2EC4B6' }]}>{isGuest ? t('sign_up') : t('sign_out')}</Text>
+                        <FontAwesome name={isGuest ? "sign-in" : "sign-out"} size={16} color={isGuest ? "#FFD700" : "#FF6B6B"} style={{ marginRight: 8 }} />
+                        <Text style={[styles.signOutText, isGuest && { color: '#FFD700' }]}>{isGuest ? t('sign_up') : t('sign_out')}</Text>
                     </TouchableOpacity>
 
                     {/* Delete Account (Hide for Guest) */}

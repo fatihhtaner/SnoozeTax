@@ -1,4 +1,4 @@
-import StarBackground from '@/components/StarBackground';
+import GradientBackground from '@/components/GradientBackground';
 import { auth } from '@/config/firebaseConfig';
 import { Colors } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Link, Stack, useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, ImageBackground, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
@@ -73,152 +73,144 @@ export default function LoginScreen() {
     };
 
     return (
-        <ImageBackground
-            source={require('@/assets/images/login-bg.png')}
-            style={styles.backgroundImage}
-            resizeMode="cover">
-            <StarBackground />
+        <GradientBackground>
             <Stack.Screen options={{ headerShown: false }} />
-            <LinearGradient
-                colors={['rgba(15, 32, 39, 0.8)', 'rgba(44, 83, 100, 0.9)', 'rgba(32, 58, 67, 0.85)']}
-                style={styles.gradient}>
-                <SafeAreaView style={styles.container}>
-                    <KeyboardAvoidingView
-                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                        style={styles.keyboardView}>
-                        <ScrollView
-                            contentContainerStyle={styles.scrollContent}
-                            showsVerticalScrollIndicator={false}
-                            keyboardShouldPersistTaps="handled">
+            <SafeAreaView style={styles.container}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.keyboardView}>
+                    <ScrollView
+                        contentContainerStyle={styles.scrollContent}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled">
 
-                            {/* Logo/Title Section */}
-                            <View style={styles.header}>
-                                <Image
-                                    source={require('@/assets/images/logo.png')}
-                                    style={styles.logo}
-                                    resizeMode="contain"
-                                />
-                                <Text style={styles.tagline}>{t('sign_in')}</Text>
-                            </View>
+                        {/* Logo/Title Section */}
+                        <View style={styles.header}>
+                            <Image
+                                source={require('@/assets/images/logo.png')}
+                                style={styles.logo}
+                                resizeMode="contain"
+                            />
+                            <Text style={styles.tagline}>{t('sign_in')}</Text>
+                        </View>
 
-                            {/* Glassmorphism Card */}
-                            <View style={styles.card}>
+                        {/* Glassmorphism Card */}
+                        <View style={styles.card}>
+                            <TextInput
+                                style={styles.input}
+                                placeholder={t('email')}
+                                placeholderTextColor="rgba(255, 255, 255, 0.6)"
+                                value={email}
+                                onChangeText={(text) => { setEmail(text); setError(null); }}
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                            />
+                            <View style={styles.passwordContainer}>
                                 <TextInput
-                                    style={styles.input}
-                                    placeholder={t('email')}
+                                    style={styles.passwordInput}
+                                    placeholder={t('password')}
                                     placeholderTextColor="rgba(255, 255, 255, 0.6)"
-                                    value={email}
-                                    onChangeText={(text) => { setEmail(text); setError(null); }}
-                                    autoCapitalize="none"
-                                    keyboardType="email-address"
+                                    value={password}
+                                    onChangeText={(text) => { setPassword(text); setError(null); }}
+                                    secureTextEntry={!showPassword}
                                 />
-                                <View style={styles.passwordContainer}>
-                                    <TextInput
-                                        style={styles.passwordInput}
-                                        placeholder={t('password')}
-                                        placeholderTextColor="rgba(255, 255, 255, 0.6)"
-                                        value={password}
-                                        onChangeText={(text) => { setPassword(text); setError(null); }}
-                                        secureTextEntry={!showPassword}
-                                    />
-                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                                        <FontAwesome name={showPassword ? "eye" : "eye-slash"} size={20} color="rgba(255, 255, 255, 0.6)" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                {error && (
-                                    <View style={styles.errorContainer}>
-                                        <FontAwesome name="exclamation-circle" size={14} color="#FF6B6B" style={{ marginRight: 6 }} />
-                                        <Text style={styles.errorText}>{error}</Text>
-                                    </View>
-                                )}
-
-                                <TouchableOpacity
-                                    style={styles.button}
-                                    onPress={handleLogin}
-                                    disabled={loading}>
-                                    <LinearGradient
-                                        colors={['#2EC4B6', '#CBF3F0']}
-                                        style={styles.gradientButton}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}>
-                                        {loading ? (
-                                            <ActivityIndicator color="#0F2027" />
-                                        ) : (
-                                            <Text style={styles.buttonText}>{t('sign_in')}</Text>
-                                        )}
-                                    </LinearGradient>
-                                </TouchableOpacity>
-
-                                {/* OR Divider */}
-                                <View style={styles.dividerContainer}>
-                                    <View style={styles.divider} />
-                                    <Text style={styles.dividerText}>{t('or_divider')}</Text>
-                                    <View style={styles.divider} />
-                                </View>
-
-                                {/* Apple Sign-In (iOS only) */}
-                                {Platform.OS === 'ios' && (
-                                    <TouchableOpacity
-                                        style={[styles.socialButton, { backgroundColor: '#000' }]}
-                                        onPress={handleAppleSignIn}
-                                        disabled={appleLoading || loading}>
-                                        {appleLoading ? (
-                                            <ActivityIndicator color="#FFF" />
-                                        ) : (
-                                            <>
-                                                <FontAwesome name="apple" size={20} color="#FFF" style={{ marginRight: 10 }} />
-                                                <Text style={[styles.socialButtonText, { color: '#FFF' }]}>{t('continue_with_apple')}</Text>
-                                            </>
-                                        )}
-                                    </TouchableOpacity>
-                                )}
-
-                                {/* Google Sign-In - Only in development build */}
-                                {__DEV__ && (
-                                    <TouchableOpacity
-                                        style={styles.socialButton}
-                                        onPress={handleGoogleSignIn}
-                                        disabled={googleLoading || loading}>
-                                        {googleLoading ? (
-                                            <ActivityIndicator color="#4285F4" />
-                                        ) : (
-                                            <>
-                                                <FontAwesome name="google" size={20} color="#4285F4" style={{ marginRight: 10 }} />
-                                                <Text style={styles.socialButtonText}>{t('continue_with_google')}</Text>
-                                            </>
-                                        )}
-                                    </TouchableOpacity>
-                                )}
-
-                                {/* Guest Mode Button */}
-                                <TouchableOpacity
-                                    style={styles.guestButton}
-                                    onPress={async () => {
-                                        setLoading(true);
-                                        await loginAsGuest();
-                                        setLoading(false);
-                                    }}
-                                    disabled={loading}>
-                                    <FontAwesome name="user-secret" size={16} color="rgba(255,255,255,0.7)" style={{ marginRight: 8 }} />
-                                    <Text style={styles.guestButtonText}>{t('continue_as_guest')}</Text>
+                                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                                    <FontAwesome name={showPassword ? "eye" : "eye-slash"} size={20} color="rgba(255, 255, 255, 0.6)" />
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Footer */}
-                            <View style={styles.footer}>
-                                <Text style={styles.footerText}>{t('dont_have_account')} </Text>
-                                <Link href="/(auth)/sign-up" asChild>
-                                    <TouchableOpacity>
-                                        <Text style={styles.footerLink}>{t('sign_up')}</Text>
-                                    </TouchableOpacity>
-                                </Link>
+                            {error && (
+                                <View style={styles.errorContainer}>
+                                    <FontAwesome name="exclamation-circle" size={14} color="#FF6B6B" style={{ marginRight: 6 }} />
+                                    <Text style={styles.errorText}>{error}</Text>
+                                </View>
+                            )}
+
+                            <TouchableOpacity
+                                style={styles.button}
+                                onPress={handleLogin}
+                                disabled={loading}>
+                                <LinearGradient
+                                    colors={['#FFD700', '#FDB931']}
+                                    style={styles.gradientButton}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}>
+                                    {loading ? (
+                                        <ActivityIndicator color="#0F2027" />
+                                    ) : (
+                                        <Text style={styles.buttonText}>{t('sign_in')}</Text>
+                                    )}
+                                </LinearGradient>
+                            </TouchableOpacity>
+
+                            {/* OR Divider */}
+                            <View style={styles.dividerContainer}>
+                                <View style={styles.divider} />
+                                <Text style={styles.dividerText}>{t('or_divider')}</Text>
+                                <View style={styles.divider} />
                             </View>
-                        </ScrollView>
-                    </KeyboardAvoidingView>
-                </SafeAreaView>
-            </LinearGradient>
-        </ImageBackground>
+
+                            {/* Apple Sign-In (iOS only) */}
+                            {Platform.OS === 'ios' && (
+                                <TouchableOpacity
+                                    style={[styles.socialButton, { backgroundColor: '#000' }]}
+                                    onPress={handleAppleSignIn}
+                                    disabled={appleLoading || loading}>
+                                    {appleLoading ? (
+                                        <ActivityIndicator color="#FFF" />
+                                    ) : (
+                                        <>
+                                            <FontAwesome name="apple" size={20} color="#FFF" style={{ marginRight: 10 }} />
+                                            <Text style={[styles.socialButtonText, { color: '#FFF' }]}>{t('continue_with_apple')}</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            )}
+
+                            {/* Google Sign-In - Only in development build */}
+                            {__DEV__ && (
+                                <TouchableOpacity
+                                    style={styles.socialButton}
+                                    onPress={handleGoogleSignIn}
+                                    disabled={googleLoading || loading}>
+                                    {googleLoading ? (
+                                        <ActivityIndicator color="#4285F4" />
+                                    ) : (
+                                        <>
+                                            <FontAwesome name="google" size={20} color="#4285F4" style={{ marginRight: 10 }} />
+                                            <Text style={styles.socialButtonText}>{t('continue_with_google')}</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            )}
+
+                            {/* Guest Mode Button */}
+                            <TouchableOpacity
+                                style={styles.guestButton}
+                                onPress={async () => {
+                                    setLoading(true);
+                                    await loginAsGuest();
+                                    setLoading(false);
+                                }}
+                                disabled={loading}>
+                                <FontAwesome name="user-secret" size={16} color="rgba(255,255,255,0.7)" style={{ marginRight: 8 }} />
+                                <Text style={styles.guestButtonText}>{t('continue_as_guest')}</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Footer */}
+                        <View style={styles.footer}>
+                            <Text style={styles.footerText}>{t('dont_have_account')} </Text>
+                            <Link href="/(auth)/sign-up" asChild>
+                                <TouchableOpacity>
+                                    <Text style={styles.footerLink}>{t('sign_up')}</Text>
+                                </TouchableOpacity>
+                            </Link>
+                        </View>
+                    </ScrollView>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </GradientBackground>
     );
 }
 
@@ -307,7 +299,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: '#2EC4B6',
+        shadowColor: '#FFD700',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -319,7 +311,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     buttonText: {
-        color: '#0F2027',
+        color: '#162046', // Deep Blue
         fontSize: 18,
         fontWeight: '700',
         letterSpacing: 0.5,
@@ -371,7 +363,7 @@ const styles = StyleSheet.create({
         fontSize: 15,
     },
     footerLink: {
-        color: '#CBF3F0',
+        color: '#FFD700', // Gold Link
         fontWeight: 'bold',
         fontSize: 15,
     },

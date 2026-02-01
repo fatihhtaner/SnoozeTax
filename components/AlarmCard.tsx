@@ -54,8 +54,8 @@ export default function AlarmCard({ alarm, onToggleActive, onPress, onDelete }: 
                 <Switch
                     value={alarm.isActive}
                     onValueChange={handleToggle}
-                    trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#2EC4B6' }}
-                    thumbColor={alarm.isActive ? '#CBF3F0' : 'rgba(255, 255, 255, 0.8)'}
+                    trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#FFD700' }}
+                    thumbColor={alarm.isActive ? '#FFF' : 'rgba(255, 255, 255, 0.8)'}
                     ios_backgroundColor="rgba(255, 255, 255, 0.2)"
                 />
             </View>
@@ -131,7 +131,7 @@ export default function AlarmCard({ alarm, onToggleActive, onPress, onDelete }: 
                 <GlassCard style={styles.card}>
                     {alarm.isActive ? (
                         <LinearGradient
-                            colors={['rgba(46, 196, 182, 0.3)', 'rgba(203, 243, 240, 0.2)']}
+                            colors={['rgba(255, 215, 0, 0.15)', 'rgba(253, 185, 49, 0.1)']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                             style={{ flex: 1 }} // Expand to fill GlassCard
@@ -200,8 +200,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     dayBadgeActive: {
-        backgroundColor: 'rgba(46, 196, 182, 0.4)',
-        borderColor: '#2EC4B6',
+        backgroundColor: 'rgba(255, 215, 0, 0.2)',
+        borderColor: '#FFD700',
     },
     dayText: {
         fontSize: 12,
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
         color: 'rgba(255, 255, 255, 0.6)',
     },
     dayTextActive: {
-        color: '#CBF3F0',
+        color: '#FFD700',
     },
     footerRow: {
         flexDirection: 'row',

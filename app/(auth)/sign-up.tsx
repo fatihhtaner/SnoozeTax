@@ -162,7 +162,7 @@ export default function SignUpScreen() {
                                 onPress={handleSignUp}
                                 disabled={loading}>
                                 <LinearGradient
-                                    colors={['#2EC4B6', '#CBF3F0']}
+                                    colors={['#FFD700', '#FDB931']}
                                     style={styles.gradientButton}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 0 }}>
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: '#2EC4B6',
+        shadowColor: '#FFD700',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     buttonText: {
-        color: '#0F2027',
+        color: '#162046', // Deep Blue
         fontSize: 18,
         fontWeight: '700',
         letterSpacing: 0.5,
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
         fontSize: 15,
     },
     footerLink: {
-        color: '#CBF3F0',
+        color: '#FFD700', // Gold Link
         fontWeight: 'bold',
         fontSize: 15,
     },

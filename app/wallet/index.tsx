@@ -79,7 +79,7 @@ export default function WalletScreen() {
 
             {/* Balance Card */}
             <LinearGradient
-                colors={isNegative ? ['#E63946', '#B00020'] : ['#2EC4B6', '#CBF3F0']}
+                colors={isNegative ? ['#E63946', '#B00020'] : ['#FFD700', '#FDB931']}
                 style={styles.card}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}

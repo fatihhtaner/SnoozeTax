@@ -24,17 +24,17 @@ export const Colors = {
   },
   dark: {
     text: '#FFFFFF',
-    background: '#0F2027', // Deep Blue
-    tint: tintColorDark,
+    background: '#162046', // Deep Blue
+    tint: '#FFD700', // Gold/Yellow (Moon Color)
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-    primary: '#CBF3F0', // Light Teal for contrast in dark mode
-    secondary: '#2EC4B6', // Teal
-    accent: '#FF6B6B',
-    deepBlue: '#0F2027',
+    tabIconSelected: '#FFD700',
+    primary: '#FFD700', // Gold/Yellow
+    secondary: '#162046', // Deep Blue
+    accent: '#FFD700',
+    deepBlue: '#162046',
     error: '#FF6B6B',
-    border: 'rgba(255, 255, 255, 0.2)',
-    backgroundGradient: ['#0F2027', '#203A43', '#2C5364'],
+    border: 'rgba(255, 215, 0, 0.3)', // Gold border
+    backgroundGradient: ['#162046', '#203A43', '#2C5364'],
   },
 };

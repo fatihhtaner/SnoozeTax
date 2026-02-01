@@ -354,7 +354,7 @@ export default function ActiveAlarmScreen() {
                         style={styles.wakeUpButton}
                         onPress={handleWakeUp}>
                         <LinearGradient
-                            colors={['#CBF3F0', '#2EC4B6']}
+                            colors={['#FDB931', '#FFD700']}
                             style={styles.gradientButton}
                             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                         >
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
     wakeUpButton: {
         height: 80,
         borderRadius: 25,
-        shadowColor: '#2EC4B6',
+        shadowColor: '#FFD700',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.4,
         shadowRadius: 15,

@@ -110,22 +110,24 @@ export const NotificationService = {
      */
     async scheduleAlarm(id: string, title: string, body: string, date: Date, soundName: string = 'default', extraData: any = {}) {
         // Ensure date is in the future
-        let triggerDate = new Date(date);
-        const now = Date.now();
-        const timeDiff = triggerDate.getTime() - now;
+        // Calculate the next occurrence based on hours and minutes
+        const now = new Date();
+        const triggerDate = new Date();
+        const originalDate = new Date(date);
 
-        // Only move to tomorrow if alarm is more than 1 minute in the past
-        // This allows alarms set for "right now" or very soon to still trigger
-        if (timeDiff < -60000) { // -60 seconds
+        triggerDate.setHours(originalDate.getHours());
+        triggerDate.setMinutes(originalDate.getMinutes());
+        triggerDate.setSeconds(0);
+        triggerDate.setMilliseconds(0);
+
+        // If the calculated time for today is in the past, schedule for tomorrow
+        if (triggerDate.getTime() <= now.getTime()) {
             triggerDate.setDate(triggerDate.getDate() + 1);
-            console.log('[NotificationService] Alarm was in the past, moved to tomorrow:', triggerDate);
-        } else if (timeDiff < 0) {
-            // If alarm is in the very recent past (< 1 min), schedule for now + 5 seconds
-            triggerDate = new Date(now + 5000);
-            console.log('[NotificationService] Alarm was just now, scheduling for 5 seconds from now');
-        } else {
-            console.log('[NotificationService] Scheduling alarm for:', triggerDate, 'in', Math.round(timeDiff / 1000), 'seconds');
         }
+
+        const timeDiff = triggerDate.getTime() - now.getTime();
+        console.log('[NotificationService] Scheduling alarm for:', triggerDate.toLocaleString(), 'in', Math.round(timeDiff / 1000), 'seconds');
+
 
         const SOUND_FILENAME_MAP: { [key: string]: string } = {
             'Classic': 'classic.wav',

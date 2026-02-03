@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 
 const CUSTOM_SOUNDS_KEY = 'custom_sounds';
 const SOUNDS_DIR = (FileSystem.documentDirectory || '') + 'sounds/';
@@ -32,6 +33,13 @@ export const CustomSoundService = {
      */
     async pickAndSaveSound(): Promise<CustomSound | null> {
         try {
+            // Request permission explicitly as requested
+            const { status } = await MediaLibrary.requestPermissionsAsync();
+            if (status !== 'granted') {
+                alert('File access permission is required to select a custom sound.');
+                return null;
+            }
+
             const result = await DocumentPicker.getDocumentAsync({
                 type: 'audio/*',
                 copyToCacheDirectory: true, // We will copy it ourselves, but safety first

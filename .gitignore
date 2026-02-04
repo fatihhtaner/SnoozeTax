@@ -43,6 +43,4 @@ app-example
 /ios
 /android
 
-# Firebase Config
-GoogleService-Info.plist
-google-services.json
+

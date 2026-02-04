@@ -144,12 +144,7 @@ export default function AlarmsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{t('tab_alarms')}</Text>
-          <TouchableOpacity
-            style={styles.testButton}
-            onPress={() => router.push({ pathname: '/alarm/active', params: { alarmId: 'test' } })}
-          >
-            <FontAwesome name="bug" size={20} color="#CBF3F0" />
-          </TouchableOpacity>
+
         </View>
 
         {loading ? (
@@ -219,11 +214,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  testButton: {
-    padding: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 20,
-  },
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

@@ -9,10 +9,15 @@ import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { Easing, FadeInDown, ZoomIn } from 'react-native-reanimated';
 
 export default function GlobalSuccessModal() {
-    const { isVisible, hideSuccessModal } = useGlobalModal();
+    const { isVisible, hideSuccessModal, modalContent } = useGlobalModal();
     const { t } = useLanguage();
 
     if (!isVisible) return null;
+
+    // Default values (Good Morning / Alarm Success)
+    const title = modalContent?.title || t('welcome') || 'Good Morning';
+    const message = modalContent?.message || t('wake_up_success_msg') || 'You did it! Keep up the great work.';
+    const iconName = modalContent?.icon ? (modalContent.icon as any) : 'sun-o';
 
     return (
         <Modal
@@ -36,7 +41,7 @@ export default function GlobalSuccessModal() {
                                     end={{ x: 1, y: 1 }}
                                 >
                                     <View style={styles.iconInnerGlow}>
-                                        <FontAwesome name="sun-o" size={64} color="#FFF" />
+                                        <FontAwesome name={iconName} size={64} color="#FFF" />
                                     </View>
                                 </LinearGradient>
                             </View>
@@ -45,14 +50,14 @@ export default function GlobalSuccessModal() {
                                 entering={FadeInDown.delay(200).duration(400)}
                                 style={styles.successModalTitle}
                             >
-                                {t('welcome') || 'Good Morning'}
+                                {title}
                             </Animated.Text>
 
                             <Animated.Text
                                 entering={FadeInDown.delay(300).duration(400)}
                                 style={styles.successModalMessage}
                             >
-                                {t('wake_up_success_msg') || 'You did it! Keep up the great work.'}
+                                {message}
                             </Animated.Text>
 
                             <Animated.View

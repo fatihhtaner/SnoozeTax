@@ -167,22 +167,20 @@ export default function LoginScreen() {
                                 </TouchableOpacity>
                             )}
 
-                            {/* Google Sign-In - Only in development build */}
-                            {__DEV__ && (
-                                <TouchableOpacity
-                                    style={styles.socialButton}
-                                    onPress={handleGoogleSignIn}
-                                    disabled={googleLoading || loading}>
-                                    {googleLoading ? (
-                                        <ActivityIndicator color="#4285F4" />
-                                    ) : (
-                                        <>
-                                            <FontAwesome name="google" size={20} color="#4285F4" style={{ marginRight: 10 }} />
-                                            <Text style={styles.socialButtonText}>{t('continue_with_google')}</Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-                            )}
+                            {/* Google Sign-In */}
+                            <TouchableOpacity
+                                style={styles.socialButton}
+                                onPress={handleGoogleSignIn}
+                                disabled={googleLoading || loading}>
+                                {googleLoading ? (
+                                    <ActivityIndicator color="#4285F4" />
+                                ) : (
+                                    <>
+                                        <FontAwesome name="google" size={20} color="#4285F4" style={{ marginRight: 10 }} />
+                                        <Text style={styles.socialButtonText}>{t('continue_with_google')}</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
 
                             {/* Guest Mode Button */}
                             <TouchableOpacity

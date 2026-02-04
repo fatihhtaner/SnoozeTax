@@ -1,6 +1,7 @@
 import GradientBackground from '@/components/GradientBackground';
 import { auth } from '@/config/firebaseConfig';
 import { Colors } from '@/constants/Colors';
+import { useGlobalModal } from '@/context/GlobalModalContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SocialAuthService } from '@/services/SocialAuthService';
@@ -11,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Link, Stack, useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SignUpScreen() {
@@ -27,6 +28,8 @@ export default function SignUpScreen() {
     const [appleLoading, setAppleLoading] = useState(false);
     const router = useRouter();
     const { t } = useLanguage();
+    const { showSuccessModal } = useGlobalModal();
+    console.log('[SignUp] useGlobalModal hook result:', { showSuccessModal });
     const colorScheme = useColorScheme();
     const theme = Colors[colorScheme ?? 'light'];
 
@@ -45,7 +48,12 @@ export default function SignUpScreen() {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await UserService.createUser(userCredential.user.uid, email, displayName);
-            Alert.alert(t('success'), t('account_created'));
+            showSuccessModal({
+                title: t('welcome_onboard') || 'Welcome!',
+                message: t('account_created_success') || 'Your account has been successfully created.',
+                icon: 'check'
+            });
+            // Allow time for modal to be seen before redirect happens automatically by auth listener
         } catch (error: any) {
             setError(getErrorMessage(error));
         } finally {
@@ -181,22 +189,20 @@ export default function SignUpScreen() {
                                 <View style={styles.divider} />
                             </View>
 
-                            {/* Google Sign-In - Only in development build */}
-                            {__DEV__ && (
-                                <TouchableOpacity
-                                    style={styles.socialButton}
-                                    onPress={handleGoogleSignIn}
-                                    disabled={googleLoading || loading}>
-                                    {googleLoading ? (
-                                        <ActivityIndicator color="#4285F4" />
-                                    ) : (
-                                        <>
-                                            <FontAwesome name="google" size={20} color="#4285F4" style={{ marginRight: 10 }} />
-                                            <Text style={styles.socialButtonText}>{t('continue_with_google')}</Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-                            )}
+                            {/* Google Sign-In */}
+                            <TouchableOpacity
+                                style={styles.socialButton}
+                                onPress={handleGoogleSignIn}
+                                disabled={googleLoading || loading}>
+                                {googleLoading ? (
+                                    <ActivityIndicator color="#4285F4" />
+                                ) : (
+                                    <>
+                                        <FontAwesome name="google" size={20} color="#4285F4" style={{ marginRight: 10 }} />
+                                        <Text style={styles.socialButtonText}>{t('continue_with_google')}</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
 
                             {/* Apple Sign-In (iOS only) */}
                             {Platform.OS === 'ios' && (

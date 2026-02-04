@@ -14,15 +14,9 @@
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "UIBackgroundModes": [
-          "audio",
           "audio"
         ],
         "CFBundleURLTypes": [
-          {
-            "CFBundleURLSchemes": [
-              "com.googleusercontent.apps.703461511477-b6s322d6m0o47p6o6lqda56bs9etlq2p"
-            ]
-          },
           {
             "CFBundleURLSchemes": [
               "com.googleusercontent.apps.703461511477-b6s322d6m0o47p6o6lqda56bs9etlq2p"
@@ -63,7 +57,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/logo.png",
-          "resizeMode": "contain",
+          "resizeMode": "cover",
           "backgroundColor": "#162046",
           "dark": {
             "backgroundColor": "#162046"

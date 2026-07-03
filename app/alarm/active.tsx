@@ -46,7 +46,7 @@ export default function ActiveAlarmScreen() {
     }, []);
 
     useEffect(() => {
-        if (alarmId && user) {
+        if (alarmId) {
             loadAlarm(alarmId, penaltyAmount, sound, label);
         }
     }, [alarmId, user, penaltyAmount, sound, label]);
@@ -206,12 +206,14 @@ export default function ActiveAlarmScreen() {
             return;
         }
 
+        const userId = user?.uid || 'guest';
+
         // 1. Try to use offline data from notification payload first
         if (pAmount && pSound) {
             console.log('[ActiveAlarm] Using offline data from payload');
             setAlarm({
                 id,
-                userId: user!.uid,
+                userId,
                 time: { seconds: Date.now() / 1000, nanoseconds: 0 } as any, // Placeholder
                 repeat: [],
                 isActive: true,
@@ -233,7 +235,7 @@ export default function ActiveAlarmScreen() {
 
         // 2. Fetch from DB to ensure validity (and get correct ID if needed for IAP)
         try {
-            const alarms = await AlarmService.getUserAlarms(user!.uid);
+            const alarms = await AlarmService.getUserAlarms(userId);
             const found = alarms.find(a => a.id === id);
             if (found) {
                 setAlarm(found);
@@ -246,7 +248,7 @@ export default function ActiveAlarmScreen() {
     };
 
     const handleSnoozePress = async () => {
-        if (!alarm || !user) return;
+        if (!alarm) return;
 
         if (!iapReady) {
             Alert.alert(t('loading'), t('please_wait_iap'));
@@ -364,7 +366,7 @@ export default function ActiveAlarmScreen() {
     };
 
     const handlePaymentSuccess = async () => {
-        if (!alarm || !user) return;
+        if (!alarm) return;
 
         // Skip DB updates for test alarm
         if (alarm.id === 'test') {
@@ -378,25 +380,39 @@ export default function ActiveAlarmScreen() {
 
         try {
             await TransactionService.recordTransaction(
-                user.uid,
+                user?.uid || 'guest',
                 'PENALTY',
                 alarm.penaltyAmount,
                 alarm.id
             );
 
+            // Stop the current ring first.
+            await SoundService.stopSound();
+
             if (alarm.id) {
-                await AlarmService.snoozeAlarm(alarm.id, 9);
+                // Cancel the currently ringing sequence...
+                await NotificationService.cancelAlarm(alarm.id);
+                // ...then re-schedule it to ring again after the snooze period.
+                // (cancelAlarm suppresses the id for ~10s, which is well before the
+                // 9-minute snooze fires, so there is no conflict.)
+                await NotificationService.scheduleSnooze(
+                    alarm.id,
+                    t('wake_up') || 'Wake Up!',
+                    alarm.label || t('time_to_get_up') || 'Time to get up!',
+                    9,
+                    alarm.sound || 'default',
+                    { penaltyAmount: alarm.penaltyAmount, sound: alarm.sound, label: alarm.label }
+                );
             }
 
             setIsProcessing(false);
             Alert.alert('Snoozed!', 'Payment successful. Alarm snoozed for 9 minutes.');
-            await SoundService.stopSound();
-            if (alarm.id) await NotificationService.cancelAlarm(alarm.id);
             router.replace('/(tabs)');
 
         } catch (error) {
             console.error(error);
             setIsProcessing(false);
+            Alert.alert(t('error') || 'Error', 'Snooze failed. Please try again.');
         }
     };
 

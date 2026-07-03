@@ -22,7 +22,97 @@ const setNotificationBehavior = (shouldPlaySound: boolean) => {
 // Default behavior
 setNotificationBehavior(true);
 
+// Maps a sound key to its bundled filename.
+const SOUND_FILENAME_MAP: { [key: string]: string } = {
+    'Classic': 'classic.wav',
+    'AlarmClockBeep': 'alarm-clock-beep.wav',
+    'DigitalClockBeep': 'alarm-digital-clock-beep.wav',
+    'AlarmTone': 'alarm-tone.wav',
+    'Alert': 'alert.wav',
+    'Battleship': 'battleship.wav',
+    'CasinoJackpot': 'casino-jackpot-alarm-and-coins.wav',
+    'CasinoWin': 'casino-win-alarm-and-coins.wav',
+    'CitySiren': 'city-alert-siren-loop.wav',
+    'ClassicShort': 'classic-short.wav',
+    'ClassicWinner': 'classic-winner.wav',
+    'Critical': 'critical.wav',
+    'DataScanner': 'data-scaner.wav',
+    'DigitalBuzzer': 'digital-clock-digital-alarm-buzzer.wav',
+    'EmergencyAlert': 'emergency-alert-alarm.wav',
+    'FacilityAlarm': 'facility-alarm-sound.wav',
+    'Facility': 'facility.wav',
+    'GameNotification': 'game-notification-wave.wav',
+    'InterfaceHint': 'interface-hint-notification.wav',
+    'MorningClock': 'morning-clock.wav',
+    'RetroGame': 'retro-game-emergency.wav',
+    'Rooster': 'rooster-crowing-in-the-morning.wav',
+    'SciFiScan': 'scanning-sci-fi.wav',
+    'SecurityBreach': 'security-facility-breach.wav',
+    'ShortRooster': 'short-rooster-crowing.wav',
+    'SlotPayout': 'slot-machine-payout.wav',
+    'SlotWin': 'slot-machine-win.wav',
+    'HallAlert': 'sound-alert-in-hall.wav',
+    'SpaceShooter': 'space-shooter.wav',
+    'Spaceship': 'spaceship.wav',
+    'StreetPublic': 'street-public.wav',
+    'VintageWarning': 'vintage-warning.wav',
+    'WarningBuzzer': 'warning-alarm-buzzer.wav',
+};
 
+// Approximate duration (seconds) of each sound, used to space repeated
+// notifications so the alarm rings continuously without overlap.
+const SOUND_DURATION_MAP: { [key: string]: number } = {
+    'Classic': 5,
+    'AlarmClockBeep': 2,
+    'DigitalClockBeep': 2,
+    'AlarmTone': 2,
+    'Alert': 5,
+    'Battleship': 5,
+    'CasinoJackpot': 5,
+    'CasinoWin': 5,
+    'CitySiren': 5,
+    'ClassicShort': 2,
+    'ClassicWinner': 5,
+    'Critical': 3,
+    'DataScanner': 2,
+    'DigitalBuzzer': 5,
+    'EmergencyAlert': 4,
+    'FacilityAlarm': 5,
+    'Facility': 4,
+    'GameNotification': 2,
+    'InterfaceHint': 2,
+    'MorningClock': 5,
+    'RetroGame': 5,
+    'Rooster': 5,
+    'SciFiScan': 5,
+    'SecurityBreach': 5,
+    'ShortRooster': 2,
+    'SlotPayout': 5,
+    'SlotWin': 5,
+    'HallAlert': 5,
+    'SpaceShooter': 5,
+    'Spaceship': 5,
+    'StreetPublic': 5,
+    'VintageWarning': 5,
+    'WarningBuzzer': 5,
+};
+
+const LONG_SOUNDS = ['Classic', 'MorningClock', 'Facility', 'SpaceShooter', 'CitySiren', 'SecurityBreach', 'VintageWarning'];
+
+const resolveSoundFile = (soundName: string): string | boolean | undefined => {
+    const soundFile = SOUND_FILENAME_MAP[soundName] || (soundName === 'default' ? true : undefined);
+    if (!soundFile && soundName !== 'default') {
+        console.warn(`[NotificationService] Sound mapping not found for ${soundName}. Using default.`);
+        return true; // Fall back to default system sound instead of silence.
+    }
+    return soundFile;
+};
+
+const resolveInterval = (soundName: string): number => {
+    const interval = SOUND_DURATION_MAP[soundName];
+    if (interval) return interval;
+    return LONG_SOUNDS.includes(soundName) ? 3 : 2;
+};
 
 
 export const NotificationService = {
@@ -129,98 +219,26 @@ export const NotificationService = {
         const timeDiff = triggerDate.getTime() - now.getTime();
         console.log('[NotificationService] Scheduling alarm for:', triggerDate.toLocaleString(), 'in', Math.round(timeDiff / 1000), 'seconds');
 
+        await this.scheduleSequence(id, title, body, triggerDate, soundName, extraData);
+    },
 
-        const SOUND_FILENAME_MAP: { [key: string]: string } = {
-            'Classic': 'classic.wav',
-            'AlarmClockBeep': 'alarm-clock-beep.wav',
-            'DigitalClockBeep': 'alarm-digital-clock-beep.wav',
-            'AlarmTone': 'alarm-tone.wav',
-            'Alert': 'alert.wav',
-            'Battleship': 'battleship.wav',
-            'CasinoJackpot': 'casino-jackpot-alarm-and-coins.wav',
-            'CasinoWin': 'casino-win-alarm-and-coins.wav',
-            'CitySiren': 'city-alert-siren-loop.wav',
-            'ClassicShort': 'classic-short.wav',
-            'ClassicWinner': 'classic-winner.wav',
-            'Critical': 'critical.wav',
-            'DataScanner': 'data-scaner.wav',
-            'DigitalBuzzer': 'digital-clock-digital-alarm-buzzer.wav',
-            'EmergencyAlert': 'emergency-alert-alarm.wav',
-            'FacilityAlarm': 'facility-alarm-sound.wav',
-            'Facility': 'facility.wav',
-            'GameNotification': 'game-notification-wave.wav',
-            'InterfaceHint': 'interface-hint-notification.wav',
-            'MorningClock': 'morning-clock.wav',
-            'RetroGame': 'retro-game-emergency.wav',
-            'Rooster': 'rooster-crowing-in-the-morning.wav',
-            'SciFiScan': 'scanning-sci-fi.wav',
-            'SecurityBreach': 'security-facility-breach.wav',
-            'ShortRooster': 'short-rooster-crowing.wav',
-            'SlotPayout': 'slot-machine-payout.wav',
-            'SlotWin': 'slot-machine-win.wav',
-            'HallAlert': 'sound-alert-in-hall.wav',
-            'SpaceShooter': 'space-shooter.wav',
-            'Spaceship': 'spaceship.wav',
-            'StreetPublic': 'street-public.wav',
-            'VintageWarning': 'vintage-warning.wav',
-            'WarningBuzzer': 'warning-alarm-buzzer.wav',
-        };
+    /**
+     * Re-schedules the alarm to ring again after a snooze period (in minutes),
+     * starting from the exact current time (not the alarm's daily HH:MM).
+     */
+    async scheduleSnooze(id: string, title: string, body: string, minutes: number, soundName: string = 'default', extraData: any = {}) {
+        const startDate = new Date(Date.now() + minutes * 60 * 1000);
+        console.log(`[NotificationService] Scheduling snooze for ${id} in ${minutes} min at ${startDate.toLocaleTimeString()}`);
+        await this.scheduleSequence(id, title, body, startDate, soundName, extraData);
+    },
 
-        const soundFile = SOUND_FILENAME_MAP[soundName] || (soundName === 'default' ? true : undefined);
-
-        if (!soundFile && soundName !== 'default') {
-            console.warn(`[NotificationService] Sound mapping not found for ${soundName}. Using default.`);
-        }
-
-        const SOUND_DURATION_MAP: { [key: string]: number } = {
-            // Updated to match actual sound file durations for seamless looping
-            'Classic': 5, // Actual duration ~5s
-            'AlarmClockBeep': 2,
-            'DigitalClockBeep': 2,
-            'AlarmTone': 2,
-            'Alert': 5,
-            'Battleship': 5,
-            'CasinoJackpot': 5,
-            'CasinoWin': 5,
-            'CitySiren': 5,
-            'ClassicShort': 2,
-            'ClassicWinner': 5,
-            'Critical': 3,
-            'DataScanner': 2,
-            'DigitalBuzzer': 5,
-            'EmergencyAlert': 4,
-            'FacilityAlarm': 5,
-            'Facility': 4,
-            'GameNotification': 2,
-            'InterfaceHint': 2,
-            'MorningClock': 5,
-            'RetroGame': 5,
-            'Rooster': 5,
-            'SciFiScan': 5,
-            'SecurityBreach': 5,
-            'ShortRooster': 2,
-            'SlotPayout': 5,
-            'SlotWin': 5,
-            'HallAlert': 5,
-            'SpaceShooter': 5,
-            'Spaceship': 5,
-            'StreetPublic': 5,
-            'VintageWarning': 5,
-            'WarningBuzzer': 5,
-        };
-
-        // Determine interval based on sound duration to prevent overlap
-        // If sound is defined in map, use its duration. 
-        // fallback: 3s for known long sounds, 2s for others (original logic safety net)
-
-        // Check if it's a known long sound irrespective of map (legacy check)
-        const LONG_SOUNDS = ['Classic', 'MorningClock', 'Facility', 'SpaceShooter', 'CitySiren', 'SecurityBreach', 'VintageWarning'];
-        const isLongSound = LONG_SOUNDS.includes(soundName);
-
-        let interval = SOUND_DURATION_MAP[soundName];
-        if (!interval) {
-            interval = isLongSound ? 3 : 2;
-        }
+    /**
+     * Schedules a burst of notifications starting at `startDate` to simulate a
+     * continuous alarm ring for ~5 minutes. Shared by scheduleAlarm/scheduleSnooze.
+     */
+    async scheduleSequence(id: string, title: string, body: string, startDate: Date, soundName: string = 'default', extraData: any = {}) {
+        const soundFile = resolveSoundFile(soundName);
+        const interval = resolveInterval(soundName);
 
         const totalDuration = 300; // 5 minutes total
         const count = Math.min(Math.ceil(totalDuration / interval), 60); // Cap at 60
@@ -228,7 +246,7 @@ export const NotificationService = {
         // Schedule notifications
         for (let i = 0; i < count; i++) {
             const sequenceId = `${id}_seq_${i}`;
-            let notificationDate = new Date(triggerDate.getTime() + i * interval * 1000);
+            let notificationDate = new Date(startDate.getTime() + i * interval * 1000);
 
             // Safety check: ensure the date is effectively in the future
             if (notificationDate.getTime() <= Date.now()) {

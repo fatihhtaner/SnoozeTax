@@ -61,7 +61,7 @@ function RootLayoutNav() {
   // Listen for language changes to update notifications
   useEffect(() => {
     const updateNotifications = async () => {
-      if (user) {
+      if (user && !isGuest) {
         try {
           console.log('[RootLayout] Updating notifications for locale:', locale);
           const alarms = await AlarmService.getUserAlarms(user.uid);
@@ -94,15 +94,16 @@ function RootLayoutNav() {
           }
         } catch (error) {
           console.error("Failed to update notifications for language change", error);
+          // Silently fail - user can still use the app, notifications just won't update
         }
       }
     };
 
     // Defer slighty to allow translations to load if needed, though t() is usually synchronous
-    if (user) {
+    if (user && !isGuest) {
       updateNotifications();
     }
-  }, [locale, user]);
+  }, [locale, user, isGuest]);
 
   // Track if user is currently on alarm screen to prevent duplicate navigation
   const isOnAlarmScreenRef = useRef(false);

@@ -12,8 +12,9 @@ const setNotificationBehavior = (shouldPlaySound: boolean) => {
         handleNotification: async () => ({
             shouldPlaySound: shouldPlaySound,
             shouldSetBadge: false,
-            shouldShowBanner: shouldPlaySound,
-            shouldShowList: shouldPlaySound,
+            // Don't show banner/list in foreground - we navigate directly to alarm screen
+            shouldShowBanner: false,
+            shouldShowList: false,
         }),
     });
 };
@@ -172,38 +173,39 @@ export const NotificationService = {
         }
 
         const SOUND_DURATION_MAP: { [key: string]: number } = {
-            'Classic': 30, // Loop is ~28-30s effectively
+            // Updated to match actual sound file durations for seamless looping
+            'Classic': 5, // Actual duration ~5s
             'AlarmClockBeep': 2,
             'DigitalClockBeep': 2,
             'AlarmTone': 2,
             'Alert': 5,
-            'Battleship': 30,
-            'CasinoJackpot': 15,
-            'CasinoWin': 15,
-            'CitySiren': 30,
+            'Battleship': 5,
+            'CasinoJackpot': 5,
+            'CasinoWin': 5,
+            'CitySiren': 5,
             'ClassicShort': 2,
             'ClassicWinner': 5,
             'Critical': 3,
             'DataScanner': 2,
             'DigitalBuzzer': 5,
             'EmergencyAlert': 4,
-            'FacilityAlarm': 15,
+            'FacilityAlarm': 5,
             'Facility': 4,
             'GameNotification': 2,
             'InterfaceHint': 2,
-            'MorningClock': 10,
-            'RetroGame': 20,
+            'MorningClock': 5,
+            'RetroGame': 5,
             'Rooster': 5,
-            'SciFiScan': 15,
+            'SciFiScan': 5,
             'SecurityBreach': 5,
             'ShortRooster': 2,
             'SlotPayout': 5,
             'SlotWin': 5,
-            'HallAlert': 15,
-            'SpaceShooter': 8,
-            'Spaceship': 30,
+            'HallAlert': 5,
+            'SpaceShooter': 5,
+            'Spaceship': 5,
             'StreetPublic': 5,
-            'VintageWarning': 8,
+            'VintageWarning': 5,
             'WarningBuzzer': 5,
         };
 

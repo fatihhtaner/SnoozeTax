@@ -102,6 +102,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 profileUnsubscribe = null;
             }
 
+            // If currentUser exists, they're authenticated (not a guest), so we can safely try to read their profile
             if (currentUser) {
                 const userRef = doc(db, 'users', currentUser.uid);
                 profileUnsubscribe = onSnapshot(userRef,
@@ -113,8 +114,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                         }
                         setLoading(false);
                     },
-                    (error) => {
-                        console.error('[AuthContext] Profile snapshot error:', error);
+                    (error: any) => {
+                        // Handle permission errors gracefully
+                        if (error?.code === 'permission-denied' || error?.code === 'missing-or-insufficient-permissions') {
+                            console.warn('[AuthContext] Permission denied for profile snapshot. User may not have proper Firestore rules configured.');
+                        } else {
+                            console.error('[AuthContext] Profile snapshot error:', error);
+                        }
+                        setUserProfile(null);
                         setLoading(false);
                     }
                 );

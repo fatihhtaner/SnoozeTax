@@ -1,6 +1,7 @@
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp } from 'firebase/app';
-import { getAuth, getReactNativePersistence, initializeAuth } from 'firebase/auth';
+import * as FirebaseAuth from 'firebase/auth';
+import { Auth, getAuth, initializeAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -19,10 +20,12 @@ export const app = initializeApp(firebaseConfig);
 // Initialize Auth
 // We attempt to initialize with React Native Persistence.
 // If that fails (e.g. during certain dev reloads), we fall back to default getAuth().
-let auth;
+let auth: Auth;
 
 try {
-    // @ts-ignore: getReactNativePersistence is valid in React Native context but types might lag
+    // getReactNativePersistence exists at runtime in the RN build but is missing from
+    // the firebase 12 type defs, so we access it dynamically.
+    const getReactNativePersistence = (FirebaseAuth as any).getReactNativePersistence;
     auth = initializeAuth(app, {
         persistence: getReactNativePersistence(ReactNativeAsyncStorage)
     });

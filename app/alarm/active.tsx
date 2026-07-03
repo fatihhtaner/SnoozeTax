@@ -1,4 +1,5 @@
 import GradientBackground from '@/components/GradientBackground';
+import { ALL_PRODUCT_IDS, LEGACY_PRODUCT_IDS, PENALTY_TIERS as TIERS_INFO, PRODUCT_IDS } from '@/constants/Products'; // Renamed locally to avoid conflict if needed, or just use as is
 import { useAuth } from '@/context/AuthContext';
 import { useGlobalModal } from '@/context/GlobalModalContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -17,19 +18,7 @@ import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } fr
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Product IDs from App Store Connect
-const TIER_IDS = [
-    'com.snoozetax.tier1', // Mild ($0.99)
-    'com.snoozetax.tier2', // Medium ($2.99)
-    'com.snoozetax.tier3', // Harsh ($4.99)
-    'com.snoozetax.tier4', // Nuclear ($9.99)
-];
-const PENALTY_TIERS = [
-    { amount: 0.99 },
-    { amount: 2.99 },
-    { amount: 4.99 },
-    { amount: 9.99 },
-];
+const PENALTY_TIERS = TIERS_INFO.map(t => ({ amount: t.amount })); // Keep existing structure for now if needed, or refactor usage
 
 export default function ActiveAlarmScreen() {
     const { alarmId, penaltyAmount, sound, label } = useLocalSearchParams<{
@@ -47,7 +36,9 @@ export default function ActiveAlarmScreen() {
     const [currentTime, setCurrentTime] = useState(new Date());
 
     // IAP State
+    const [iapReady, setIapReady] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [availableProducts, setAvailableProducts] = useState<InAppPurchases.IAPItemDetails[]>([]);
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -79,7 +70,24 @@ export default function ActiveAlarmScreen() {
     // Initialize IAP 
     useEffect(() => {
         setupIAP();
+        
+        // Retry product loading if no products found initially (for "Ready to Submit" products)
+        // These products may take a moment to become available, especially with Sandbox accounts
+        const retryTimer = setTimeout(async () => {
+            console.log('[IAP] Checking if products loaded, retrying if needed...');
+            try {
+                const { results } = await InAppPurchases.getProductsAsync(PRODUCT_IDS);
+                if (results && results.length > 0) {
+                    setAvailableProducts(results);
+                    console.log('[IAP] Products loaded on retry:', results.map(p => p.productId).join(', '));
+                }
+            } catch (error) {
+                console.warn('[IAP] Retry failed:', error);
+            }
+        }, 3000); // Retry after 3 seconds
+        
         return () => {
+            clearTimeout(retryTimer);
             // Safely disconnect
             InAppPurchases.disconnectAsync().catch(() => {
                 // Ignore disconnect errors (e.g. already disconnected)
@@ -90,11 +98,66 @@ export default function ActiveAlarmScreen() {
     const setupIAP = async () => {
         try {
             await InAppPurchases.connectAsync();
+            // Query ONLY current product IDs first (not legacy) for better compatibility
+            // "Ready to Submit" products should work with Sandbox test accounts
+            const { results } = await InAppPurchases.getProductsAsync(PRODUCT_IDS);
+            
+            if (results && results.length > 0) {
+                setAvailableProducts(results);
+                console.log('[IAP] ✅ Products loaded successfully:');
+                results.forEach(p => {
+                    console.log(`[IAP]   - ${p.productId}: ${p.title || 'N/A'} (${p.price || 'N/A'})`);
+                });
+                console.log('[IAP] Total products available:', results.length);
+                
+                // If we got some products but not all, try legacy IDs too
+                if (results.length < PRODUCT_IDS.length) {
+                    console.log('[IAP] Some products missing, trying legacy IDs...');
+                    try {
+                        const { results: legacyResults } = await InAppPurchases.getProductsAsync(LEGACY_PRODUCT_IDS);
+                        if (legacyResults && legacyResults.length > 0) {
+                            setAvailableProducts(prev => [...prev, ...legacyResults]);
+                            console.log('[IAP] Legacy products found:', legacyResults.map(p => p.productId).join(', '));
+                        }
+                    } catch (legacyError) {
+                        console.warn('[IAP] Legacy products query failed:', legacyError);
+                    }
+                }
+            } else {
+                console.warn('[IAP] ⚠️ No products returned from store.');
+                console.warn('[IAP] Requested product IDs:', PRODUCT_IDS.join(', '));
+                console.warn('[IAP] Possible reasons:');
+                console.warn('[IAP]   1. Products are "Ready to Submit" - need Sandbox test account');
+                console.warn('[IAP]   2. Not signed in with Sandbox test account on device');
+                console.warn('[IAP]   3. Running on simulator (IAP not available)');
+                console.warn('[IAP]   4. Products need to be approved and published');
+                setAvailableProducts([]);
+            }
+            setIapReady(true);
         } catch (error: any) {
             if (error.message && error.message.includes('Already connected')) {
                 // Ignore if already connected
+                // Still try to get products even if already connected
+                try {
+                    const { results } = await InAppPurchases.getProductsAsync(ALL_PRODUCT_IDS);
+                    if (results && results.length > 0) {
+                        setAvailableProducts(results);
+                        console.log('[IAP] Products loaded (already connected):', results.map(p => p.productId).join(', '));
+                        console.log('[IAP] Total products available:', results.length);
+                    } else {
+                        console.warn('[IAP] No products returned (already connected)');
+                        setAvailableProducts([]);
+                    }
+                    setIapReady(true);
+                } catch (e) {
+                    console.error('[IAP] Failed to get products after connect:', e);
+                    setAvailableProducts([]);
+                    setIapReady(true); // Still mark as ready to prevent blocking
+                }
             } else {
-                console.error('IAP Setup Error:', error);
+                console.error('[IAP] Setup Error:', error);
+                setAvailableProducts([]);
+                setIapReady(true); // Still mark as ready to prevent blocking
             }
         }
 
@@ -153,8 +216,12 @@ export default function ActiveAlarmScreen() {
                 repeat: [],
                 isActive: true,
                 penaltyAmount: parseFloat(pAmount),
-                // Infer tierId from amount (approximate)
-                tierId: TIER_IDS.find((_, i) => PENALTY_TIERS[i].amount === parseFloat(pAmount)) || 'com.snoozetax.tier1',
+                // Infer tierId from amount by matching to PENALTY_TIERS
+                tierId: (() => {
+                    const amount = parseFloat(pAmount);
+                    const tier = TIERS_INFO.find(t => Math.abs(t.amount - amount) < 0.01);
+                    return tier?.id || 'com.iftsoftware.snoozetax.tier1';
+                })(),
                 label: pLabel || '',
                 sound: pSound,
                 createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
@@ -180,21 +247,108 @@ export default function ActiveAlarmScreen() {
 
     const handleSnoozePress = async () => {
         if (!alarm || !user) return;
+
+        if (!iapReady) {
+            Alert.alert(t('loading'), t('please_wait_iap'));
+            // Try to reconnect if stuck?
+            setupIAP();
+            return;
+        }
+
         setIsProcessing(true);
 
-        const tierId = alarm.tierId; // e.g. 'com.snoozetax.tier1'
+        const tierId = alarm.tierId; // e.g. 'com.iftsoftware.snoozetax.tier1'
+        const penaltyAmount = alarm.penaltyAmount || 0;
 
         try {
             if (tierId) {
+                // Verify product is available before purchase
+                let product = availableProducts.find(p => p.productId === tierId);
+                
+                // If exact match not found, try to find by amount as fallback
+                if (!product && availableProducts.length > 0) {
+                    console.warn('[IAP] Product not found by ID, trying to find by amount:', tierId);
+                    // Find the tier that matches the penalty amount
+                    const matchingTier = TIERS_INFO.find(t => Math.abs(t.amount - penaltyAmount) < 0.01);
+                    if (matchingTier) {
+                        product = availableProducts.find(p => p.productId === matchingTier.id);
+                        if (product) {
+                            console.log('[IAP] Found product by amount fallback:', product.productId);
+                        }
+                    }
+                }
+
+                // If still not found, try any available product as last resort (for dev/testing)
+                if (!product && availableProducts.length > 0) {
+                    console.warn('[IAP] Using first available product as fallback');
+                    product = availableProducts[0];
+                }
+
+                if (!product) {
+                    const availableIds = availableProducts.map(p => p.productId).join(', ') || 'none';
+                    console.error('[IAP] Product not found in available products:', {
+                        requested: tierId,
+                        available: availableIds,
+                        availableCount: availableProducts.length
+                    });
+                    
+                    // Try to reload products one more time
+                    try {
+                        const { results } = await InAppPurchases.getProductsAsync(ALL_PRODUCT_IDS);
+                        if (results && results.length > 0) {
+                            setAvailableProducts(results);
+                            console.log('[IAP] Products reloaded, retrying...');
+                            // Retry with reloaded products
+                            const retryProduct = results.find(p => p.productId === tierId);
+                            if (retryProduct) {
+                                console.log('[IAP] Product found after reload, proceeding with purchase');
+                                await InAppPurchases.purchaseItemAsync(tierId);
+                                return; // Success, exit early
+                            }
+                        }
+                    } catch (reloadError) {
+                        console.error('[IAP] Failed to reload products:', reloadError);
+                    }
+
+                    // If still in dev mode, allow simulation
+                    if (__DEV__) {
+                        Alert.alert("Dev Mode", "Product not configured in store. Simulating purchase.", [
+                            { text: "OK", onPress: () => handlePaymentSuccess() }
+                        ]);
+                        return;
+                    }
+
+                    Alert.alert(
+                        t('error') || 'Error',
+                        `Product not available. Please check your App Store/Play Store configuration.\n\nRequested: ${tierId}\nAvailable: ${availableIds || 'none'}`
+                    );
+                    setIsProcessing(false);
+                    return;
+                }
+
+                console.log('[IAP] Purchasing product:', product.productId, product.title);
                 // Attempt Real Purchase
-                await InAppPurchases.purchaseItemAsync(tierId);
+                await InAppPurchases.purchaseItemAsync(product.productId);
                 // Processing continues in setPurchaseListener
             } else {
-                // Fallback if no tierId (should ideally not happen in prod)
+                // Fallback if no tierId - try to infer from amount
+                if (penaltyAmount > 0) {
+                    const matchingTier = TIERS_INFO.find(t => Math.abs(t.amount - penaltyAmount) < 0.01);
+                    if (matchingTier) {
+                        const product = availableProducts.find(p => p.productId === matchingTier.id);
+                        if (product) {
+                            console.log('[IAP] No tierId, using inferred product from amount:', product.productId);
+                            await InAppPurchases.purchaseItemAsync(product.productId);
+                            return;
+                        }
+                    }
+                }
+                
+                // Final fallback
                 Alert.alert('Configuration Error', 'This alarm has no payment tier associated.');
                 setIsProcessing(false);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.log("Purchase Error / Simulator Fallback:", error);
             // On Simulator, purchaseItemAsync throws error. We simulate success for Dev.
             if (__DEV__) {
@@ -202,7 +356,8 @@ export default function ActiveAlarmScreen() {
                     { text: "OK", onPress: () => handlePaymentSuccess() }
                 ]);
             } else {
-                Alert.alert('Error', 'Payment could not be initiated.');
+                // Show actual error message for debugging
+                Alert.alert('Error', `Payment could not be initiated: ${error.message || JSON.stringify(error)}`);
                 setIsProcessing(false);
             }
         }

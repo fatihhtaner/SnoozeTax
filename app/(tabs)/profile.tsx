@@ -89,7 +89,6 @@ export default function ProfileScreen() {
                             )}
                         </View>
                         <Text style={styles.name}>{isGuest ? t('guest_user') : (userProfile?.displayName || 'User')}</Text>
-                        <Text style={styles.email}>{isGuest ? t('not_signed_in') : userProfile?.email}</Text>
                     </View>
 
                     {/* Stats Summary Row (Hide for Guests) */}
@@ -278,7 +277,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    scrollContent: { padding: 20, paddingBottom: 100 },
+    scrollContent: { padding: 20, paddingBottom: 130 },
     header: { alignItems: 'center', marginBottom: 30 },
     avatarContainer: {
         width: 100, height: 100, borderRadius: 50, borderWidth: 2,
@@ -296,8 +295,7 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
     },
-    name: { fontSize: 24, fontWeight: 'bold', marginBottom: 5, color: '#FFFFFF' },
-    email: { fontSize: 16, marginBottom: 15, color: 'rgba(255, 255, 255, 0.7)' },
+    name: { fontSize: 24, fontWeight: 'bold', marginBottom: 15, color: '#FFFFFF' },
     statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 },
     statItem: {
         flex: 1,

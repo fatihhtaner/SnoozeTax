@@ -49,8 +49,17 @@ export default function AlarmsScreen() {
       setLoading(true);
       const userAlarms = await AlarmService.getUserAlarms(userId);
       setAlarms(sortAlarms(userAlarms));
-    } catch (error) {
-      console.error('Failed to load alarms', error);
+    } catch (error: any) {
+      // Handle permission errors gracefully
+      if (error?.code === 'permission-denied' || error?.code === 'missing-or-insufficient-permissions') {
+        console.warn('Failed to load alarms: Permission denied. User may not have proper Firestore rules configured.');
+        // For guest users, this is expected - they use local storage
+        if (userId === 'guest') {
+          setAlarms([]);
+        }
+      } else {
+        console.error('Failed to load alarms', error);
+      }
     } finally {
       setLoading(false);
     }
@@ -222,7 +231,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 130,
   },
   emptyContainer: {
     flex: 1,
@@ -251,7 +260,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 24,
-    bottom: 24,
+    bottom: 110,
     borderRadius: 30,
     shadowColor: '#FFD700',
     shadowOffset: { width: 0, height: 4 },

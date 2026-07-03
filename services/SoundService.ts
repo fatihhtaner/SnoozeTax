@@ -73,8 +73,22 @@ export const SoundService = {
             // UIBackgroundModes: ["audio"] is set in app.json
             player = createAudioPlayer(source);
 
-            player.loop = true; // Loop alarms continuously
+            player.volume = 1.0; // Ensure volume is at max
+
+            // Manually handle looping since player.loop doesn't work
+            player.addListener('playbackStatusUpdate', (status) => {
+                console.log('[SoundService] Playback status:', status);
+
+                // When the sound finishes, restart it to create a loop
+                if (status.didJustFinish && player) {
+                    console.log('[SoundService] Sound finished, restarting for loop...');
+                    player.seekTo(0);
+                    player.play();
+                }
+            });
+
             player.play();
+            console.log('[SoundService] Sound started playing with manual loop handling');
 
         } catch (error) {
             console.error('Failed to play sound', error);

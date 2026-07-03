@@ -13,19 +13,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Timestamp } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Dimensions, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 
 // Apple App Store Connect Product IDs
 // You must create these Consumable products in App Store Connect
-const PENALTY_TIERS = [
-    { id: 'com.anonymous.snoozetax.tier1', labelKey: 'tier_mild', emoji: '🐣', amount: 0.99, display: '$0.99' },
-    { id: 'com.anonymous.snoozetax.tier2', labelKey: 'tier_medium', emoji: '😬', amount: 2.99, display: '$2.99' },
-    { id: 'com.anonymous.snoozetax.tier3', labelKey: 'tier_harsh', emoji: '🔥', amount: 4.99, display: '$4.99' },
-    { id: 'com.anonymous.snoozetax.tier4', labelKey: 'tier_nuclear', emoji: '💀', amount: 9.99, display: '$9.99' },
-];
+import { PENALTY_TIERS } from '@/constants/Products';
+
+// Apple App Store Connect Product IDs
+// You must create these Consumable products in App Store Connect
 
 export default function AlarmEditorScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -100,6 +98,29 @@ export default function AlarmEditorScreen() {
         }
     };
 
+    const slideAnim = React.useRef(new Animated.Value(Dimensions.get('window').height)).current;
+    const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (soundModalVisible) {
+            slideAnim.setValue(Dimensions.get('window').height);
+            fadeAnim.setValue(0);
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+                Animated.spring(slideAnim, {
+                    toValue: 0,
+                    useNativeDriver: true,
+                    damping: 20,
+                    stiffness: 90,
+                })
+            ]).start();
+        }
+    }, [soundModalVisible]);
+
     useEffect(() => {
         if (id) {
             loadAlarm(id);
@@ -111,8 +132,16 @@ export default function AlarmEditorScreen() {
             const alarms = await AlarmService.getUserAlarms(userId);
             const alarm = alarms.find(a => a.id === alarmId);
             if (alarm) {
-                setDate(alarm.time.toDate());
-                setRepeat(alarm.repeat);
+                if (alarm.time && typeof alarm.time.toDate === 'function') {
+                    setDate(alarm.time.toDate());
+                } else if (alarm.time && (alarm.time as any).seconds) {
+                    // Fallback for plain objects (e.g. from local storage or JSON serialization)
+                    setDate(new Date((alarm.time as any).seconds * 1000));
+                } else {
+                    // Fallback for invalid date
+                    setDate(new Date());
+                }
+                setRepeat(alarm.repeat || []);
 
                 // Find tier by amount or ID if possible, otherwise default
                 const foundTier = PENALTY_TIERS.find(p => p.amount === alarm.penaltyAmount) || PENALTY_TIERS[0];
@@ -219,10 +248,26 @@ export default function AlarmEditorScreen() {
         );
     }
 
+
+
     const closeSoundModal = async () => {
         await SoundService.stopSound();
         setPlayingSound(null);
-        setSoundModalVisible(false);
+
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: Dimensions.get('window').height,
+                duration: 200,
+                useNativeDriver: true,
+            })
+        ]).start(() => {
+            setSoundModalVisible(false);
+        });
     };
 
     return (
@@ -376,80 +421,96 @@ export default function AlarmEditorScreen() {
             </SafeAreaView>
             {/* Sound Selection Modal */}
             <Modal
-                animationType="slide"
+                animationType="none"
                 transparent={true}
                 visible={soundModalVisible}
                 onRequestClose={closeSoundModal}
             >
-                <TouchableOpacity
-                    style={styles.modalOverlay}
-                    activeOpacity={1}
-                    onPress={closeSoundModal}
-                >
-                    <TouchableWithoutFeedback>
-                        <View style={styles.modalContent}>
-                            <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>{t('sound')}</Text>
-                                <TouchableOpacity onPress={closeSoundModal}>
-                                    <FontAwesome name="close" size={24} color="#FFF" />
-                                </TouchableOpacity>
-                            </View>
-
-                            <FlatList
-                                data={[...customSounds.map(s => ({ ...s, isCustom: true })), ...SOUNDS]}
-                                keyExtractor={(item: any) => item.isCustom ? item.id : item.key}
-                                ListHeaderComponent={
-                                    <TouchableOpacity style={styles.addSoundButton} onPress={handleAddCustomSound}>
-                                        <FontAwesome name="plus" size={16} color="#0F2027" />
-                                        <Text style={styles.addSoundButtonText}>{t('add_custom_sound') || "Add Custom Sound"}</Text>
+                <View style={{ flex: 1 }}>
+                    <Animated.View
+                        style={[
+                            StyleSheet.absoluteFill,
+                            {
+                                backgroundColor: 'rgba(0,0,0,0.8)',
+                                opacity: fadeAnim
+                            }
+                        ]}
+                    />
+                    <TouchableOpacity
+                        style={styles.modalOverlay}
+                        activeOpacity={1}
+                        onPress={closeSoundModal}
+                    >
+                        <TouchableWithoutFeedback>
+                            <Animated.View
+                                style={[
+                                    styles.modalContent,
+                                    { transform: [{ translateY: slideAnim }] }
+                                ]}
+                            >
+                                <View style={styles.modalHeader}>
+                                    <Text style={styles.modalTitle}>{t('sound')}</Text>
+                                    <TouchableOpacity onPress={closeSoundModal}>
+                                        <FontAwesome name="close" size={24} color="#FFF" />
                                     </TouchableOpacity>
-                                }
-                                renderItem={({ item }: { item: any }) => (
-                                    <View style={styles.modalItem}>
-                                        <TouchableOpacity
-                                            style={styles.modalItemSelect}
-                                            onPress={() => {
-                                                setSound(item.isCustom ? item.uri : item.key);
-                                                closeSoundModal();
-                                            }}
-                                        >
+                                </View>
 
-                                            <Text style={[
-                                                styles.modalItemText,
-                                                sound === (item.isCustom ? item.uri : item.key) && styles.modalItemTextActive
-                                            ]}>
-                                                {item.isCustom ? item.name : t(item.labelKey)}
-                                            </Text>
-                                            {sound === (item.isCustom ? item.uri : item.key) && <FontAwesome name="check" size={16} color="#CBF3F0" />}
+                                <FlatList
+                                    data={[...customSounds.map(s => ({ ...s, isCustom: true })), ...SOUNDS]}
+                                    keyExtractor={(item: any) => item.isCustom ? item.id : item.key}
+                                    ListHeaderComponent={
+                                        <TouchableOpacity style={styles.addSoundButton} onPress={handleAddCustomSound}>
+                                            <FontAwesome name="plus" size={16} color="#0F2027" />
+                                            <Text style={styles.addSoundButtonText}>{t('add_custom_sound') || "Add Custom Sound"}</Text>
                                         </TouchableOpacity>
-
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                            {item.isCustom && (
-                                                <TouchableOpacity
-                                                    style={styles.deleteSoundButton}
-                                                    onPress={() => handleDeleteCustomSound(item.id)}
-                                                >
-                                                    <FontAwesome name="trash" size={16} color="#FF6B6B" />
-                                                </TouchableOpacity>
-                                            )}
+                                    }
+                                    renderItem={({ item }: { item: any }) => (
+                                        <View style={styles.modalItem}>
                                             <TouchableOpacity
-                                                style={styles.modalPlayButton}
-                                                onPress={() => handlePlaySound(item.isCustom ? item.uri : item.key)}
+                                                style={styles.modalItemSelect}
+                                                onPress={() => {
+                                                    setSound(item.isCustom ? item.uri : item.key);
+                                                    closeSoundModal();
+                                                }}
                                             >
-                                                <FontAwesome
-                                                    name={playingSound === (item.isCustom ? item.uri : item.key) ? "stop" : "play"}
-                                                    size={16}
-                                                    color={playingSound === (item.isCustom ? item.uri : item.key) ? "#FF6B6B" : "#CBF3F0"}
-                                                />
+
+                                                <Text style={[
+                                                    styles.modalItemText,
+                                                    sound === (item.isCustom ? item.uri : item.key) && styles.modalItemTextActive
+                                                ]}>
+                                                    {item.isCustom ? item.name : t(item.labelKey)}
+                                                </Text>
+                                                {sound === (item.isCustom ? item.uri : item.key) && <FontAwesome name="check" size={16} color="#CBF3F0" />}
                                             </TouchableOpacity>
+
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                                {item.isCustom && (
+                                                    <TouchableOpacity
+                                                        style={styles.deleteSoundButton}
+                                                        onPress={() => handleDeleteCustomSound(item.id)}
+                                                    >
+                                                        <FontAwesome name="trash" size={16} color="#FF6B6B" />
+                                                    </TouchableOpacity>
+                                                )}
+                                                <TouchableOpacity
+                                                    style={styles.modalPlayButton}
+                                                    onPress={() => handlePlaySound(item.isCustom ? item.uri : item.key)}
+                                                >
+                                                    <FontAwesome
+                                                        name={playingSound === (item.isCustom ? item.uri : item.key) ? "stop" : "play"}
+                                                        size={16}
+                                                        color={playingSound === (item.isCustom ? item.uri : item.key) ? "#FF6B6B" : "#CBF3F0"}
+                                                    />
+                                                </TouchableOpacity>
+                                            </View>
                                         </View>
-                                    </View>
-                                )}
-                                contentContainerStyle={{ paddingBottom: 20 }}
-                            />
-                        </View>
-                    </TouchableWithoutFeedback>
-                </TouchableOpacity>
+                                    )}
+                                    contentContainerStyle={{ paddingBottom: 20 }}
+                                />
+                            </Animated.View>
+                        </TouchableWithoutFeedback>
+                    </TouchableOpacity>
+                </View>
             </Modal>
         </GradientBackground>
     );

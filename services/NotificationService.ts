@@ -199,15 +199,25 @@ export const NotificationService = {
      * Schedule a local notification (alarm).
      * Schedules a sequence of notifications to simulate a continuous alarm.
      */
-    async scheduleAlarm(id: string, title: string, body: string, date: Date, soundName: string = 'default', extraData: any = {}) {
-        // Ensure date is in the future
-        // Calculate the next occurrence based on hours and minutes
+    async scheduleAlarm(id: string, title: string, body: string, date: Date, soundName: string = 'default', extraData: any = {}, repeat: number[] = []) {
+        const originalDate = new Date(date);
+        const hour = originalDate.getHours();
+        const minute = originalDate.getMinutes();
+
+        // Repeating alarm: schedule one auto-repeating weekly notification per
+        // selected weekday. This respects the selected days AND keeps the alarm
+        // ringing on subsequent weeks without needing to re-schedule, while
+        // using very few of iOS' 64 pending-notification slots.
+        if (repeat && repeat.length > 0) {
+            await this.scheduleWeekly(id, title, body, hour, minute, repeat, soundName, extraData);
+            return;
+        }
+
+        // One-shot alarm: schedule the next occurrence (today or tomorrow) at HH:MM.
         const now = new Date();
         const triggerDate = new Date();
-        const originalDate = new Date(date);
-
-        triggerDate.setHours(originalDate.getHours());
-        triggerDate.setMinutes(originalDate.getMinutes());
+        triggerDate.setHours(hour);
+        triggerDate.setMinutes(minute);
         triggerDate.setSeconds(0);
         triggerDate.setMilliseconds(0);
 
@@ -223,6 +233,44 @@ export const NotificationService = {
     },
 
     /**
+     * Schedules a repeating alarm using one weekly notification per selected day.
+     * `repeat` uses the app convention where 0 = Sunday ... 6 = Saturday.
+     */
+    async scheduleWeekly(id: string, title: string, body: string, hour: number, minute: number, repeat: number[], soundName: string = 'default', extraData: any = {}) {
+        const soundFile = resolveSoundFile(soundName);
+        // De-duplicate and keep only valid weekdays.
+        const days = Array.from(new Set(repeat)).filter(d => d >= 0 && d <= 6);
+
+        for (const day of days) {
+            // expo-notifications weekday: 1 = Sunday ... 7 = Saturday
+            const weekday = day + 1;
+            const sequenceId = `${id}_day_${weekday}`;
+
+            const trigger: Notifications.WeeklyTriggerInput = {
+                type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+                weekday,
+                hour,
+                minute,
+            };
+
+            await Notifications.scheduleNotificationAsync({
+                identifier: sequenceId,
+                content: {
+                    title,
+                    body,
+                    sound: soundFile,
+                    data: { alarmId: id, ...extraData },
+                    interruptionLevel: 'timeSensitive',
+                    categoryIdentifier: ALARM_CATEGORY,
+                },
+                trigger,
+            });
+        }
+
+        console.log(`[NotificationService] Scheduled weekly alarm ${id} for days [${days.join(', ')}] at ${hour}:${String(minute).padStart(2, '0')}`);
+    },
+
+    /**
      * Re-schedules the alarm to ring again after a snooze period (in minutes),
      * starting from the exact current time (not the alarm's daily HH:MM).
      */
@@ -233,15 +281,21 @@ export const NotificationService = {
     },
 
     /**
-     * Schedules a burst of notifications starting at `startDate` to simulate a
-     * continuous alarm ring for ~5 minutes. Shared by scheduleAlarm/scheduleSnooze.
+     * Schedules a short burst of notifications starting at `startDate` to simulate a
+     * continuous alarm ring. Shared by scheduleAlarm (one-shot) / scheduleSnooze.
      */
     async scheduleSequence(id: string, title: string, body: string, startDate: Date, soundName: string = 'default', extraData: any = {}) {
         const soundFile = resolveSoundFile(soundName);
-        const interval = resolveInterval(soundName);
 
-        const totalDuration = 300; // 5 minutes total
-        const count = Math.min(Math.ceil(totalDuration / interval), 60); // Cap at 60
+        // iOS keeps at most 64 pending local notifications for the whole app.
+        // A single alarm must therefore use only a small slice of that budget so
+        // that multiple alarms can coexist. We cap each alarm at MAX_PINGS and
+        // spread them across the ring window (continuous ringing is handled by
+        // the in-app SoundService loop once the alarm screen is opened).
+        const RING_WINDOW_SEC = 240; // ~4 minutes of periodic pings
+        const MAX_PINGS = 12;
+        const interval = Math.max(resolveInterval(soundName), Math.ceil(RING_WINDOW_SEC / MAX_PINGS));
+        const count = Math.min(Math.ceil(RING_WINDOW_SEC / interval), MAX_PINGS);
 
         // Schedule notifications
         for (let i = 0; i < count; i++) {
@@ -288,19 +342,42 @@ export const NotificationService = {
         // Cancel all potential sequence notifications in parallel for speed
         const promises = [];
 
-        // 1. Cancel scheduled notifications
-        // Max possible count is 150 (300s / 2s interval)
-        // Using 200 to be safe
+        // 1. Cancel one-shot / snooze burst notifications.
+        // (Older builds could schedule up to 60; 200 keeps us safe against leftovers.)
         for (let i = 0; i < 200; i++) {
             const sequenceId = `${id}_seq_${i}`;
             promises.push(Notifications.cancelScheduledNotificationAsync(sequenceId));
         }
 
-        // 2. Dismiss any already delivered notifications (clears system tray)
+        // 2. Cancel weekly repeating notifications (one per weekday, 1..7).
+        for (let d = 1; d <= 7; d++) {
+            promises.push(Notifications.cancelScheduledNotificationAsync(`${id}_day_${d}`));
+        }
+
+        // 3. Dismiss any already delivered notifications (clears system tray)
         promises.push(Notifications.dismissAllNotificationsAsync());
 
         await Promise.all(promises);
         console.log('[NotificationService] Cancelled and dismissed all notifications for alarm:', id);
+    },
+
+    /**
+     * Stops the CURRENT ring without destroying a repeating (weekly) schedule.
+     * Cancels only the one-shot/snooze burst notifications and clears the tray,
+     * leaving the `_day_` weekly notifications intact so a repeating alarm still
+     * fires on subsequent weeks. Use this on snooze / wake-up of repeat alarms.
+     */
+    async dismissCurrentRing(id: string) {
+        console.log('[NotificationService] Dismissing current ring (keeping repeat schedule):', id);
+        this.suppressAlarm(id);
+
+        const promises = [];
+        for (let i = 0; i < 200; i++) {
+            promises.push(Notifications.cancelScheduledNotificationAsync(`${id}_seq_${i}`));
+        }
+        promises.push(Notifications.dismissAllNotificationsAsync());
+
+        await Promise.all(promises);
     },
 
     /**

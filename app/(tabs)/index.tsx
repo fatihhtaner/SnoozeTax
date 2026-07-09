@@ -93,7 +93,8 @@ export default function AlarmsScreen() {
             alarm.label || t('time_to_get_up') || 'Time to get up!',
             alarm.time.toDate(),
             alarm.sound || 'default',
-            { penaltyAmount: alarm.penaltyAmount, sound: alarm.sound, label: alarm.label }
+            { penaltyAmount: alarm.penaltyAmount, sound: alarm.sound, label: alarm.label },
+            alarm.repeat || []
           );
         }
       } else {

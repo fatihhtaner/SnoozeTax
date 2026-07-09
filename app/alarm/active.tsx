@@ -1,5 +1,5 @@
 import GradientBackground from '@/components/GradientBackground';
-import { ALL_PRODUCT_IDS, LEGACY_PRODUCT_IDS, PENALTY_TIERS as TIERS_INFO, PRODUCT_IDS } from '@/constants/Products'; // Renamed locally to avoid conflict if needed, or just use as is
+import { ALL_PRODUCT_IDS, PENALTY_TIERS as TIERS_INFO } from '@/constants/Products';
 import { useAuth } from '@/context/AuthContext';
 import { useGlobalModal } from '@/context/GlobalModalContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -13,7 +13,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as InAppPurchases from 'expo-in-app-purchases';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,6 +39,10 @@ export default function ActiveAlarmScreen() {
     const [iapReady, setIapReady] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [availableProducts, setAvailableProducts] = useState<InAppPurchases.IAPItemDetails[]>([]);
+    const iapInitRef = useRef<Promise<InAppPurchases.IAPItemDetails[]> | null>(null);
+    const iapQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+    const purchaseListenerSet = useRef(false);
+    const iapConnectedRef = useRef(false);
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -67,108 +71,69 @@ export default function ActiveAlarmScreen() {
         };
     }, [alarm?.sound]);
 
-    // Initialize IAP 
-    useEffect(() => {
-        setupIAP();
-        
-        // Retry product loading if no products found initially (for "Ready to Submit" products)
-        // These products may take a moment to become available, especially with Sandbox accounts
-        const retryTimer = setTimeout(async () => {
-            console.log('[IAP] Checking if products loaded, retrying if needed...');
-            try {
-                const { results } = await InAppPurchases.getProductsAsync(PRODUCT_IDS);
-                if (results && results.length > 0) {
-                    setAvailableProducts(results);
-                    console.log('[IAP] Products loaded on retry:', results.map(p => p.productId).join(', '));
+    const runIAP = <T,>(label: string, fn: () => Promise<T>): Promise<T> => {
+        const next = iapQueueRef.current
+            .catch(() => undefined)
+            .then(async () => {
+                try {
+                    return await fn();
+                } catch (error) {
+                    console.warn(`[IAP] ${label} failed:`, error);
+                    throw error;
                 }
-            } catch (error) {
-                console.warn('[IAP] Retry failed:', error);
-            }
-        }, 3000); // Retry after 3 seconds
-        
-        return () => {
-            clearTimeout(retryTimer);
-            // Safely disconnect
-            InAppPurchases.disconnectAsync().catch(() => {
-                // Ignore disconnect errors (e.g. already disconnected)
             });
-        };
-    }, []);
+        iapQueueRef.current = next.then(() => undefined, () => undefined);
+        return next;
+    };
 
-    const setupIAP = async () => {
+    const connectIAPInternal = async () => {
+        if (iapConnectedRef.current) return;
         try {
             await InAppPurchases.connectAsync();
-            // Query ONLY current product IDs first (not legacy) for better compatibility
-            // "Ready to Submit" products should work with Sandbox test accounts
-            const { results } = await InAppPurchases.getProductsAsync(PRODUCT_IDS);
-            
-            if (results && results.length > 0) {
-                setAvailableProducts(results);
-                console.log('[IAP] ✅ Products loaded successfully:');
-                results.forEach(p => {
-                    console.log(`[IAP]   - ${p.productId}: ${p.title || 'N/A'} (${p.price || 'N/A'})`);
-                });
-                console.log('[IAP] Total products available:', results.length);
-                
-                // If we got some products but not all, try legacy IDs too
-                if (results.length < PRODUCT_IDS.length) {
-                    console.log('[IAP] Some products missing, trying legacy IDs...');
-                    try {
-                        const { results: legacyResults } = await InAppPurchases.getProductsAsync(LEGACY_PRODUCT_IDS);
-                        if (legacyResults && legacyResults.length > 0) {
-                            setAvailableProducts(prev => [...prev, ...legacyResults]);
-                            console.log('[IAP] Legacy products found:', legacyResults.map(p => p.productId).join(', '));
-                        }
-                    } catch (legacyError) {
-                        console.warn('[IAP] Legacy products query failed:', legacyError);
-                    }
-                }
-            } else {
-                console.warn('[IAP] ⚠️ No products returned from store.');
-                console.warn('[IAP] Requested product IDs:', PRODUCT_IDS.join(', '));
-                console.warn('[IAP] Possible reasons:');
-                console.warn('[IAP]   1. Products are "Ready to Submit" - need Sandbox test account');
-                console.warn('[IAP]   2. Not signed in with Sandbox test account on device');
-                console.warn('[IAP]   3. Running on simulator (IAP not available)');
-                console.warn('[IAP]   4. Products need to be approved and published');
-                setAvailableProducts([]);
-            }
-            setIapReady(true);
+            iapConnectedRef.current = true;
         } catch (error: any) {
-            if (error.message && error.message.includes('Already connected')) {
-                // Ignore if already connected
-                // Still try to get products even if already connected
-                try {
-                    const { results } = await InAppPurchases.getProductsAsync(ALL_PRODUCT_IDS);
-                    if (results && results.length > 0) {
-                        setAvailableProducts(results);
-                        console.log('[IAP] Products loaded (already connected):', results.map(p => p.productId).join(', '));
-                        console.log('[IAP] Total products available:', results.length);
-                    } else {
-                        console.warn('[IAP] No products returned (already connected)');
-                        setAvailableProducts([]);
-                    }
-                    setIapReady(true);
-                } catch (e) {
-                    console.error('[IAP] Failed to get products after connect:', e);
-                    setAvailableProducts([]);
-                    setIapReady(true); // Still mark as ready to prevent blocking
-                }
-            } else {
-                console.error('[IAP] Setup Error:', error);
-                setAvailableProducts([]);
-                setIapReady(true); // Still mark as ready to prevent blocking
+            if (error?.message?.includes('Already connected')) {
+                iapConnectedRef.current = true;
+                return;
             }
+            throw error;
         }
+    };
 
-        try {
+    const fetchProductsInternal = async (): Promise<InAppPurchases.IAPItemDetails[]> => {
+        await connectIAPInternal();
+        const { results } = await InAppPurchases.getProductsAsync(ALL_PRODUCT_IDS);
+        return results ?? [];
+    };
 
-            // Set Listener for Purchase Updates
+    const ensureIAPReady = (): Promise<InAppPurchases.IAPItemDetails[]> => {
+        if (!iapInitRef.current) {
+            iapInitRef.current = runIAP('init', async () => {
+                const products = await fetchProductsInternal();
+                console.log('[IAP] Products loaded:', products.map(p => p.productId).join(', ') || 'none');
+                return products;
+            }).catch((error) => {
+                iapInitRef.current = null;
+                throw error;
+            });
+        }
+        return iapInitRef.current;
+    };
+
+    const purchaseProduct = (productId: string) =>
+        runIAP('purchase', async () => {
+            await connectIAPInternal();
+            await InAppPurchases.purchaseItemAsync(productId);
+        });
+
+    // Initialize IAP — all native calls go through runIAP queue
+    useEffect(() => {
+        if (!purchaseListenerSet.current) {
+            purchaseListenerSet.current = true;
             InAppPurchases.setPurchaseListener(({ responseCode, results, errorCode }) => {
                 if (responseCode === InAppPurchases.IAPResponseCode.OK && results) {
                     results.forEach(async (purchase) => {
                         if (!purchase.acknowledged) {
-                            // "Consume" the product so it can be bought again (Consumable)
                             await InAppPurchases.finishTransactionAsync(purchase, true);
                             handlePaymentSuccess();
                         }
@@ -178,14 +143,39 @@ export default function ActiveAlarmScreen() {
                 } else {
                     console.warn(`IAP Error ${errorCode}`);
                     setIsProcessing(false);
-                    Alert.alert(t('error'), 'Purchase failed. Please try again.');
+                    Alert.alert(t('error'), t('purchase_failed'));
                 }
             });
-
-        } catch (error) {
-            console.error("IAP Setup Error: ", error);
         }
-    };
+
+        ensureIAPReady()
+            .then((products) => {
+                setAvailableProducts(products);
+                setIapReady(true);
+            })
+            .catch((error) => {
+                console.error('[IAP] Setup Error:', error);
+                setAvailableProducts([]);
+                setIapReady(true);
+            });
+
+        const retryTimer = setTimeout(() => {
+            iapInitRef.current = null;
+            ensureIAPReady()
+                .then((products) => {
+                    if (products.length > 0) {
+                        setAvailableProducts(products);
+                        setIapReady(true);
+                    }
+                })
+                .catch((error) => console.warn('[IAP] Retry failed:', error));
+        }, 5000);
+
+        return () => {
+            clearTimeout(retryTimer);
+            // Do NOT disconnect here — causes race if user opens alarm again quickly
+        };
+    }, []);
 
     const loadAlarm = async (id: string, pAmount?: string, pSound?: string, pLabel?: string) => {
         if (id === 'test') {
@@ -247,119 +237,94 @@ export default function ActiveAlarmScreen() {
         }
     };
 
+    const offerDevSimulation = (reason?: string) => {
+        console.warn('[IAP] Dev simulation:', reason ?? 'fallback');
+        Alert.alert(
+            t('dev_mode_title'),
+            t('dev_simulate_purchase'),
+            [
+                { text: t('cancel'), style: 'cancel', onPress: () => setIsProcessing(false) },
+                { text: 'OK', onPress: () => { void handlePaymentSuccess(); } },
+            ]
+        );
+    };
+
     const handleSnoozePress = async () => {
         if (!alarm) return;
 
-        if (!iapReady) {
-            Alert.alert(t('loading'), t('please_wait_iap'));
-            // Try to reconnect if stuck?
-            setupIAP();
+        setIsProcessing(true);
+
+        let products = availableProducts;
+        try {
+            products = await ensureIAPReady();
+            setAvailableProducts(products);
+            setIapReady(true);
+        } catch (error) {
+            console.warn('[IAP] Could not initialize before purchase:', error);
+            if (__DEV__) {
+                offerDevSimulation('IAP init failed');
+                return;
+            }
+            Alert.alert(t('error'), t('iap_unavailable'));
+            setIsProcessing(false);
             return;
         }
 
-        setIsProcessing(true);
+        // Store returned nothing — common in dev builds before App Store Connect is set up
+        if (products.length === 0) {
+            if (__DEV__) {
+                offerDevSimulation('no store products');
+                return;
+            }
+            Alert.alert(t('error'), t('iap_products_unavailable'));
+            setIsProcessing(false);
+            return;
+        }
 
-        const tierId = alarm.tierId; // e.g. 'com.iftsoftware.snoozetax.tier1'
+        const tierId = alarm.tierId;
         const penaltyAmount = alarm.penaltyAmount || 0;
 
         try {
             if (tierId) {
-                // Verify product is available before purchase
-                let product = availableProducts.find(p => p.productId === tierId);
-                
-                // If exact match not found, try to find by amount as fallback
-                if (!product && availableProducts.length > 0) {
-                    console.warn('[IAP] Product not found by ID, trying to find by amount:', tierId);
-                    // Find the tier that matches the penalty amount
+                let product = products.find(p => p.productId === tierId);
+
+                if (!product) {
                     const matchingTier = TIERS_INFO.find(t => Math.abs(t.amount - penaltyAmount) < 0.01);
                     if (matchingTier) {
-                        product = availableProducts.find(p => p.productId === matchingTier.id);
-                        if (product) {
-                            console.log('[IAP] Found product by amount fallback:', product.productId);
-                        }
+                        product = products.find(p => p.productId === matchingTier.id);
                     }
-                }
-
-                // If still not found, try any available product as last resort (for dev/testing)
-                if (!product && availableProducts.length > 0) {
-                    console.warn('[IAP] Using first available product as fallback');
-                    product = availableProducts[0];
                 }
 
                 if (!product) {
-                    const availableIds = availableProducts.map(p => p.productId).join(', ') || 'none';
-                    console.error('[IAP] Product not found in available products:', {
-                        requested: tierId,
-                        available: availableIds,
-                        availableCount: availableProducts.length
-                    });
-                    
-                    // Try to reload products one more time
-                    try {
-                        const { results } = await InAppPurchases.getProductsAsync(ALL_PRODUCT_IDS);
-                        if (results && results.length > 0) {
-                            setAvailableProducts(results);
-                            console.log('[IAP] Products reloaded, retrying...');
-                            // Retry with reloaded products
-                            const retryProduct = results.find(p => p.productId === tierId);
-                            if (retryProduct) {
-                                console.log('[IAP] Product found after reload, proceeding with purchase');
-                                await InAppPurchases.purchaseItemAsync(tierId);
-                                return; // Success, exit early
-                            }
-                        }
-                    } catch (reloadError) {
-                        console.error('[IAP] Failed to reload products:', reloadError);
-                    }
-
-                    // If still in dev mode, allow simulation
-                    if (__DEV__) {
-                        Alert.alert("Dev Mode", "Product not configured in store. Simulating purchase.", [
-                            { text: "OK", onPress: () => handlePaymentSuccess() }
-                        ]);
-                        return;
-                    }
-
-                    Alert.alert(
-                        t('error') || 'Error',
-                        `Product not available. Please check your App Store/Play Store configuration.\n\nRequested: ${tierId}\nAvailable: ${availableIds || 'none'}`
-                    );
-                    setIsProcessing(false);
-                    return;
+                    product = products[0];
+                    console.warn('[IAP] Using first available product as fallback:', product.productId);
                 }
 
                 console.log('[IAP] Purchasing product:', product.productId, product.title);
-                // Attempt Real Purchase
-                await InAppPurchases.purchaseItemAsync(product.productId);
-                // Processing continues in setPurchaseListener
-            } else {
-                // Fallback if no tierId - try to infer from amount
-                if (penaltyAmount > 0) {
-                    const matchingTier = TIERS_INFO.find(t => Math.abs(t.amount - penaltyAmount) < 0.01);
-                    if (matchingTier) {
-                        const product = availableProducts.find(p => p.productId === matchingTier.id);
-                        if (product) {
-                            console.log('[IAP] No tierId, using inferred product from amount:', product.productId);
-                            await InAppPurchases.purchaseItemAsync(product.productId);
-                            return;
-                        }
-                    }
+                await purchaseProduct(product.productId);
+            } else if (penaltyAmount > 0) {
+                const matchingTier = TIERS_INFO.find(t => Math.abs(t.amount - penaltyAmount) < 0.01);
+                const product = matchingTier
+                    ? products.find(p => p.productId === matchingTier.id)
+                    : products[0];
+
+                if (product) {
+                    await purchaseProduct(product.productId);
+                    return;
                 }
-                
-                // Final fallback
-                Alert.alert('Configuration Error', 'This alarm has no payment tier associated.');
+
+                Alert.alert(t('error'), t('no_payment_tier'));
+                setIsProcessing(false);
+            } else {
+                Alert.alert(t('error'), t('no_payment_tier'));
                 setIsProcessing(false);
             }
         } catch (error: any) {
-            console.log("Purchase Error / Simulator Fallback:", error);
-            // On Simulator, purchaseItemAsync throws error. We simulate success for Dev.
+            console.warn('[IAP] Purchase error:', error?.message ?? error);
             if (__DEV__) {
-                Alert.alert("Dev Mode", "Simulating successful purchase (IAP not available on Simulator).", [
-                    { text: "OK", onPress: () => handlePaymentSuccess() }
-                ]);
+                offerDevSimulation('purchaseItemAsync failed');
             } else {
-                // Show actual error message for debugging
-                Alert.alert('Error', `Payment could not be initiated: ${error.message || JSON.stringify(error)}`);
+                Alert.alert(t('error'), t('purchase_failed'));
                 setIsProcessing(false);
             }
         }
@@ -390,11 +355,12 @@ export default function ActiveAlarmScreen() {
             await SoundService.stopSound();
 
             if (alarm.id) {
-                // Cancel the currently ringing sequence...
-                await NotificationService.cancelAlarm(alarm.id);
+                // Stop the currently ringing sequence WITHOUT destroying a repeating
+                // (weekly) schedule, so a repeat alarm still fires next week...
+                await NotificationService.dismissCurrentRing(alarm.id);
                 // ...then re-schedule it to ring again after the snooze period.
-                // (cancelAlarm suppresses the id for ~10s, which is well before the
-                // 9-minute snooze fires, so there is no conflict.)
+                // (dismissCurrentRing suppresses the id for ~10s, which is well before
+                // the 9-minute snooze fires, so there is no conflict.)
                 await NotificationService.scheduleSnooze(
                     alarm.id,
                     t('wake_up') || 'Wake Up!',
@@ -424,10 +390,19 @@ export default function ActiveAlarmScreen() {
             // 1. Stop sound and notifications IMMEDIATELY
             await SoundService.stopSound();
 
+            const isRepeating = !!(alarm?.repeat && alarm.repeat.length > 0);
+
             if (targetId) {
                 // Suppress triggering new navigation from these cancellations
                 NotificationService.suppressAlarm(targetId);
-                await NotificationService.cancelAlarm(targetId);
+                if (isRepeating) {
+                    // Repeating alarm: only stop the current ring, keep the weekly
+                    // schedule so it fires again next week.
+                    await NotificationService.dismissCurrentRing(targetId);
+                } else {
+                    // One-shot alarm: cancel everything.
+                    await NotificationService.cancelAlarm(targetId);
+                }
             } else {
                 console.warn('[ActiveAlarm] No ID found to suppress!');
             }

@@ -193,7 +193,8 @@ export default function AlarmEditorScreen() {
                     label || t('time_to_get_up'),
                     cleanDate,
                     sound,
-                    { penaltyAmount: selectedTier.amount, sound, label }
+                    { penaltyAmount: selectedTier.amount, sound, label },
+                    repeat
                 );
             } else {
                 const newAlarm = await AlarmService.addAlarm(userId, alarmData);
@@ -203,7 +204,8 @@ export default function AlarmEditorScreen() {
                     label || t('time_to_get_up'),
                     cleanDate,
                     sound,
-                    { penaltyAmount: selectedTier.amount, sound, label }
+                    { penaltyAmount: selectedTier.amount, sound, label },
+                    repeat
                 );
             }
             router.back();
